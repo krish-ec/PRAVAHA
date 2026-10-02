@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>PRAVAHA — Collector Portal</title>
+<meta name="description" content="Collector portal: scan e-waste, check fair prices, find authorized recyclers and track earnings — offline-tolerant, in your language." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23C1652E'/%3E%3Cpath d='M16 7l6 4v10l-6 4-6-4V11z' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E" />
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem("kc-theme");
+      if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+    } catch (e) {}
+  })();
+</script>
+<style>
+  /* ============ Design tokens — lifted from the PRAVAHA design system ============ */
+  :root{
+    --bg:#F3F6F2; --bg-2:#EAEEE7; --panel:#FFFFFF; --panel-2:#F6F8F4;
+    --ink:#141F1B; --ink-dim:#4C5851; --ink-faint:#8B958C;
+    --border:rgba(20,31,27,0.12); --border-strong:rgba(20,31,27,0.22);
+    --copper:#B85A28; --copper-ink:#8f4720; --verdigris:#2F7D62; --steel:#6A7B88; --ochre:#A97C1E;
+    --shadow:0 1px 2px rgba(20,31,27,0.06), 0 12px 32px -16px rgba(20,31,27,0.18);
+    --shadow-lg:0 24px 60px -24px rgba(20,31,27,0.35);
+    --radius-s:10px; --radius-m:16px; --radius-l:26px;
+    --font-display:'Space Grotesk','Inter',sans-serif; --font-body:'Inter','Noto Sans Devanagari',sans-serif;
+    --ease:cubic-bezier(.22,.68,0,1);
+  }
+  html[data-theme="dark"]{
+    --bg:#101613; --bg-2:#161D19; --panel:#1A211D; --panel-2:#1F2721;
+    --ink:#ECF2EE; --ink-dim:#A9B6AE; --ink-faint:#69766F;
+    --border:rgba(236,242,238,0.10); --border-strong:rgba(236,242,238,0.18);
+    --copper:#E0824A; --copper-ink:#f2a06e; --verdigris:#57BE97; --steel:#9BAAB5; --ochre:#D8B04A;
+    --shadow:0 1px 2px rgba(0,0,0,0.3), 0 12px 32px -16px rgba(0,0,0,0.5);
+    --shadow-lg:0 24px 70px -20px rgba(0,0,0,0.6);
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  @media (prefers-reduced-motion: reduce){ *{animation-duration:.001ms !important; transition-duration:.001ms !important;} }
+  body{position:relative; isolation:isolate; margin:0; background:var(--bg); color:var(--ink); font-family:var(--font-body); font-size:16px; line-height:1.5; -webkit-font-smoothing:antialiased; transition:background .35s var(--ease), color .35s var(--ease); padding-bottom:calc(84px + env(safe-area-inset-bottom,0px)); padding-top:env(safe-area-inset-top,0px);}
+  body::before{content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; background:radial-gradient(ellipse at 76% 44%,rgba(203,128,83,.14),transparent 34%),radial-gradient(ellipse at 22% 68%,rgba(84,139,125,.12),transparent 36%),radial-gradient(ellipse at 52% 50%,rgba(255,255,255,.48),transparent 48%),linear-gradient(125deg,#f4f0e7 0%,#e8efea 48%,#e4ece5 100%);}
+  html[data-theme="dark"] body::before{background:radial-gradient(ellipse at 76% 44%,rgba(224,133,82,.2),transparent 34%),radial-gradient(ellipse at 22% 68%,rgba(55,143,131,.16),transparent 36%),radial-gradient(ellipse at 52% 50%,rgba(130,95,68,.14),transparent 48%),linear-gradient(125deg,#202623 0%,#2a2924 48%,#1d2925 100%);}
+  .logout-btn{display:inline-flex; align-items:center; justify-content:center; gap:.45rem; padding:.72rem 1rem; border-radius:999px; border:1px solid var(--border); background:var(--panel); color:var(--ink); font-weight:700; box-shadow:var(--shadow); cursor:pointer; transition:transform .2s ease, border-color .2s ease;}
+  .logout-btn:hover{transform:translateY(-1px); border-color:var(--copper); color:var(--copper);}
+  img,svg{display:block; max-width:100%;}
+  a{color:inherit; text-decoration:none;}
+  button{font:inherit; color:inherit; background:none; border:none; cursor:pointer;}
+  input,select{font:inherit; color:inherit;}
+  :focus-visible{outline:2px solid var(--copper); outline-offset:2px; border-radius:4px;}
+  .icon{width:1em; height:1em; stroke:currentColor; fill:none; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0;}
+  .num{font-variant-numeric:tabular-nums;}
+  .touch-min{min-height:44px;}
+
+  /* ---------- Header ---------- */
+  .site-header{position:sticky; top:0; z-index:100; background:color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border-bottom:1px solid transparent; transition:border-color .3s,background .3s;}
+  .site-header.scrolled{border-bottom-color:var(--border);}
+  .site-header.scrolled{border-bottom-color:var(--border);}
+  .site-header .header-inner{max-width:1180px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; gap:1.5rem; height:68px; padding:0 clamp(1.25rem,4vw,2.5rem);}
+  .brandmark{display:flex; align-items:center; gap:.6rem; min-width:0;}
+  .brandmark .logo-chip{width:34px; height:34px; border-radius:9px; background:var(--ink); color:var(--bg); display:grid; place-items:center; flex-shrink:0;}
+  html[data-theme="dark"] .brandmark .logo-chip{background:var(--copper); color:#1a1006;}
+  .brandmark .txt{min-width:0;}
+  .brandmark .txt .b1{font-family:var(--font-display); font-weight:700; font-size:1rem; letter-spacing:-0.01em; line-height:1.1;}
+  .brandmark .txt .b2{font-size:.72rem; font-weight:600; color:var(--ink-faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .brandmark-link{display:inline-flex; align-items:center; justify-content:center; border-radius:12px; transition:transform .2s ease, opacity .2s ease;}
+  .brandmark-link:hover{transform:translateY(-1px); opacity:.92;}
+  .scan-methods{display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:.75rem; margin:1rem 0 1.2rem;}
+  .scan-method{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.5rem; width:100%; min-height:124px; padding:1rem .75rem; border:1px solid var(--border); border-radius:var(--radius-m); background:var(--panel-2); color:var(--ink); font-weight:700; cursor:pointer; transition:border-color .2s, transform .2s, background .2s;}
+  .scan-method:hover{border-color:var(--copper); transform:translateY(-1px);}
+  .scan-method .icon{width:28px; height:28px; color:var(--copper);}
+  .scan-preview{margin-top:1rem; border:1px solid var(--border); border-radius:var(--radius-m); background:var(--panel-2); overflow:hidden;}
+  .scan-preview img{display:block; width:100%; max-height:260px; object-fit:cover;}
+  .camera-stage{display:none; margin-top:1rem; border:1px solid var(--border); border-radius:var(--radius-m); background:var(--panel-2); overflow:hidden;}
+  .camera-stage.active{display:block;}
+  .camera-stage video{display:block; width:100%; max-height:220px; background:#0e1411; object-fit:cover;}
+  .camera-actions{display:flex; gap:.5rem; padding:.7rem; justify-content:end;}
+  .header-actions{display:flex; align-items:center; gap:.5rem; flex-shrink:0;}
+  .lang-toggle{display:flex; background:var(--panel-2); border:1px solid var(--border); border-radius:999px; padding:3px; gap:2px;}
+  .lang-btn{padding:.32rem .55rem; border-radius:999px; font-size:.74rem; font-weight:700; color:var(--ink-faint); transition:background .2s,color .2s;}
+  .lang-btn.active{background:var(--panel); color:var(--ink); box-shadow:var(--shadow);}
+  .theme-toggle{width:36px; height:36px; border-radius:50%; display:grid; place-items:center; border:1px solid var(--border); color:var(--ink-dim); flex-shrink:0;}
+  .theme-toggle:hover{border-color:var(--copper); color:var(--copper);}
+  .theme-icon{display:none;} html[data-theme="light"] .theme-icon-sun{display:flex;} html[data-theme="dark"] .theme-icon-moon{display:flex;}
+  .site-header .logo{display:flex; align-items:center; font-family:var(--font-display); font-weight:600; font-size:1.02rem; color:var(--ink); flex-shrink:0; text-decoration:none;}
+  .brand-logo{display:block; width:auto; height:42px; object-fit:contain; flex-shrink:0;}
+  html[data-theme="dark"] .brand-logo{background:transparent; border-radius:0;}
+  .site-header .nav-links{display:flex; align-items:center; gap:1.9rem;}
+  .site-header .nav-links a{font-size:.92rem; font-weight:500; color:var(--ink-dim); position:relative; padding:.3rem 0; text-decoration:none; transition:color .2s;}
+  .site-header .nav-links a:hover{color:var(--ink);}
+  .site-header .nav-links a.current{color:var(--copper);}
+  .site-header .nav-links a::after{content:""; position:absolute; left:0; right:0; bottom:-2px; height:2px; background:var(--copper); transform:scaleX(0); transform-origin:left; transition:transform .25s var(--ease);}
+  .site-header .nav-links a:hover::after,.site-header .nav-links a.current::after{transform:scaleX(1);}
+  .site-header .nav-links a.nav-demo,.site-header .mobile-nav a.nav-demo{padding-right:1.1em;}
+  .site-header .nav-links a.nav-demo::before{content:"\2192"; position:absolute; right:0; top:50%; transform:translate(-4px,-50%); opacity:0; transition:transform .25s var(--ease),opacity .25s var(--ease);}
+  .site-header .nav-links a.nav-demo:hover{padding-right:1.4em;}
+  .site-header .nav-links a.nav-demo:hover::before{opacity:1; transform:translate(0,-50%);}
+  .site-header .header-actions{display:flex; align-items:center; gap:.6rem; flex-shrink:0;}
+  .site-header .lang-toggle{display:flex; background:var(--panel-2); border:1px solid var(--border); border-radius:999px; padding:3px; gap:2px;}
+  .site-header .lang-btn{padding:.35rem .65rem; border-radius:999px; font-size:.78rem; font-weight:600; color:var(--ink-faint); background:transparent; border:0; cursor:pointer;}
+  .site-header .lang-btn.active{background:var(--panel); color:var(--ink); box-shadow:var(--shadow);}
+  .site-header .theme-toggle{width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:1px solid var(--border); color:var(--ink-dim); background:transparent; cursor:pointer;}
+  .site-header .theme-toggle:hover{border-color:var(--copper); color:var(--copper);}
+  .site-header .theme-toggle .icon{width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
+  .site-header .nav-toggle{display:none; width:38px; height:38px; align-items:center; justify-content:center; border:1px solid var(--border); border-radius:10px; color:var(--ink); background:transparent; cursor:pointer;}
+  .site-header .nav-toggle .icon{width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
+  .site-header .mobile-nav{display:none;}
+  .site-footer{padding:5.5rem 0 2rem; border-top:1px solid var(--border); margin-top:2rem; color:var(--ink); background:var(--panel);}
+  .site-footer .container{max-width:1180px; margin:0 auto; padding:0 clamp(1.25rem,4vw,2.5rem);}
+  .footer-statement{font-family:var(--font-display); font-weight:600; font-size:clamp(1.7rem,3.6vw,2.6rem); line-height:1.15; margin-bottom:3.5rem; max-width:36rem; color:var(--ink);}
+  .footer-statement .accent{color:var(--copper);}
+  .footer-grid{display:grid; grid-template-columns:1.4fr 1fr 1fr 1fr; gap:2.5rem; padding-bottom:3rem; border-bottom:1px solid var(--border);}
+  .footer-brand .logo{margin-bottom:.9rem;}
+  .footer-brand p{color:var(--ink-dim); font-size:.88rem; max-width:20rem;}
+  .footer-col h4{font-size:.78rem; font-weight:700; letter-spacing:.03em; color:var(--ink-faint); margin:0 0 .9rem;}
+  .footer-col a{display:block; font-size:.9rem; color:var(--ink-dim); margin-bottom:.65rem;}
+  .footer-col a:hover{color:var(--copper);}
+  .footer-bottom{display:flex; justify-content:space-between; flex-wrap:wrap; gap:.6rem; padding-top:1.4rem; font-size:.8rem; color:var(--ink-faint);}
+  @media (max-width:880px){
+    .site-header .nav-links{display:none;}
+    .site-header .header-actions .lang-toggle{display:none;}
+    .site-header .nav-toggle{display:flex; flex-shrink:0;}
+    .site-header .mobile-nav{display:flex; flex-direction:column; gap:1.1rem; position:fixed; inset:68px 0 auto 0; z-index:90; padding:1.25rem clamp(1.25rem,4vw,2.5rem) 1.75rem; border-bottom:1px solid var(--border); background:var(--bg); transform:translateY(-8px); opacity:0; pointer-events:none; transition:transform .25s var(--ease),opacity .25s var(--ease);}
+    .site-header .mobile-nav.open{opacity:1; transform:translateY(0); pointer-events:auto;}
+    .site-header .mobile-nav a{font-size:1.02rem; font-weight:500; color:var(--ink); position:relative; text-decoration:none;}
+    .site-header .mobile-nav .lang-toggle{display:flex; align-self:flex-start;}
+  }
+  @media (max-width:760px){ .footer-grid{grid-template-columns:1fr 1fr;} }
+  @media (max-width:720px){ .brand-logo{height:36px;} }
+
+  .conn-banner{max-width:900px; margin:0 auto; padding:0 1rem;}
+  .pill{display:inline-flex; align-items:center; gap:.4rem; font-size:.74rem; font-weight:700; padding:.35rem .65rem; border-radius:999px;}
+  .pill.warn{background:color-mix(in srgb, var(--ochre) 18%, transparent); color:var(--copper-ink);}
+  .pill.ok{background:color-mix(in srgb, var(--verdigris) 15%, transparent); color:var(--verdigris);}
+  .pill .dot{width:6px; height:6px; border-radius:50%; background:currentColor;}
+
+  /* ---------- Layout ---------- */
+  main{max-width:900px; margin:0 auto; padding:1rem 1rem 2rem;}
+  .grid2{display:grid; gap:1rem; grid-template-columns:1fr;}
+  @media (min-width:840px){ .grid2{grid-template-columns:1.2fr .8fr;} }
+  .stack{display:flex; flex-direction:column; gap:1rem;}
+  .panel{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius-m); box-shadow:var(--shadow);}
+  .panel-pad{padding:1.1rem;}
+  h1.page-title{font-family:var(--font-display); font-weight:700; letter-spacing:-0.01em; font-size:clamp(1.4rem,2.2vw + 1rem,2rem); margin:.15rem 0;}
+  .eyebrow{font-size:.8rem; font-weight:700; color:var(--ink-dim);}
+  .muted{color:var(--ink-dim);}
+  .faint{color:var(--ink-faint);}
+
+  /* ---------- Buttons ---------- */
+  .btn{display:inline-flex; align-items:center; justify-content:center; gap:.5rem; padding:.8rem 1.2rem; border-radius:999px; font-weight:700; font-size:.94rem; font-family:var(--font-display); transition:transform .2s var(--ease), box-shadow .2s var(--ease), background .2s, border-color .2s, color .2s; white-space:nowrap;}
+  .btn-primary{background:var(--ink); color:var(--bg);}
+  html[data-theme="dark"] .btn-primary{background:var(--copper); color:#1a1006;}
+  .btn-primary:hover{transform:translateY(-2px); box-shadow:0 14px 28px -12px rgba(20,31,27,.4);}
+  .btn-accent{background:var(--copper); color:#fff;}
+  .btn-accent:hover{transform:translateY(-2px); box-shadow:0 14px 28px -12px rgba(184,90,40,.45);}
+  .btn-outline{background:transparent; border:1.5px solid var(--border-strong); color:var(--ink);}
+  .btn-outline:hover{border-color:var(--copper); color:var(--copper);}
+  .btn-block{width:100%;}
+  .btn-lg{padding:1rem 1.5rem; font-size:1.02rem;}
+  .btn:disabled{opacity:.45; cursor:not-allowed; transform:none !important;}
+
+  /* ---------- Primary CTA (Scan & Sell) ---------- */
+  .cta-scan{position:relative; isolation:isolate; overflow:hidden; display:flex; align-items:center; gap:1rem; padding:1.2rem 1.35rem; border-radius:var(--radius-l); background:var(--ink); color:#fff; box-shadow:var(--shadow-lg); transition:transform .25s var(--ease), background .25s;}
+  .cta-scan::before,.cta-scan::after{content:""; position:absolute; z-index:0; pointer-events:none; opacity:0;}
+  .cta-scan::before{top:-55%; bottom:-55%; left:-35%; width:28%; transform:translateX(-180%) skewX(-18deg); background:linear-gradient(90deg,transparent,rgba(255,255,255,.18) 25%,rgba(255,255,255,.95) 50%,rgba(255,255,255,.24) 72%,transparent);}
+  .cta-scan::after{top:0; bottom:0; left:-26%; width:30%; transform:translateX(-150%); mix-blend-mode:screen; background:radial-gradient(circle,rgba(255,255,255,.95) 0 1px,transparent 2px) 15% 24%/8px 8px no-repeat,radial-gradient(circle,rgba(255,255,255,.85) 0 1px,transparent 2px) 52% 68%/9px 9px no-repeat,radial-gradient(circle,rgba(255,255,255,.8) 0 1px,transparent 2px) 88% 38%/7px 7px no-repeat;}
+  .cta-scan>*{position:relative; z-index:1;}
+  html[data-theme="dark"] .cta-scan{background:linear-gradient(135deg, var(--copper), #8f4720);}
+  .cta-scan:hover{transform:translateY(-2px);}
+  @media (hover:hover) and (prefers-reduced-motion:no-preference){
+    .cta-scan:hover::before{animation:ctaScanSheen .85s ease-out;}
+    .cta-scan:hover::after{animation:ctaScanSparkle .85s ease-out;}
+  }
+  @keyframes ctaScanSheen{0%{opacity:0; transform:translateX(-180%) skewX(-18deg);}15%{opacity:1;}82%{opacity:.9;}100%{opacity:0; transform:translateX(520%) skewX(-18deg);}}
+  @keyframes ctaScanSparkle{0%{opacity:0; transform:translateX(-150%);}22%{opacity:1;}76%{opacity:.9;}100%{opacity:0; transform:translateX(500%);}}
+  .cta-scan .ic{width:58px; height:58px; border-radius:16px; background:var(--copper); display:grid; place-items:center; flex-shrink:0;}
+  .cta-scan .ic .icon{width:28px; height:28px;}
+  .cta-scan .big{font-family:var(--font-display); font-weight:700; font-size:clamp(1.3rem,2vw + 1rem,1.7rem); line-height:1.1;}
+  .cta-scan .sub{opacity:.75; font-size:.85rem; margin-top:.2rem;}
+
+  /* ---------- Quick nav ---------- */
+  .quicknav{display:grid; grid-template-columns:repeat(2,1fr); gap:.75rem;}
+  @media (min-width:560px){ .quicknav{grid-template-columns:repeat(4,1fr);} }
+  .qn-card{border:1px solid var(--border); background:var(--panel); border-radius:var(--radius-m); padding:.95rem; box-shadow:var(--shadow); transition:transform .2s var(--ease), border-color .2s;}
+  .qn-card:hover{transform:translateY(-2px); border-color:var(--border-strong);}
+  .qn-card .icon{width:26px; height:26px; color:var(--copper);}
+  .qn-card p.lbl{font-weight:700; margin:.55rem 0 .1rem; line-height:1.2;}
+  .qn-card p.sub{font-size:.76rem; color:var(--ink-dim); margin:0;}
+
+  /* ---------- Money card ---------- */
+  .money-card{border-radius:var(--radius-l); padding:1.2rem; background:var(--copper); color:#fff; box-shadow:var(--shadow);}
+  .money-card .lbl{font-size:.74rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; opacity:.85;}
+  .money-card .amt{font-family:var(--font-display); font-weight:700; font-size:clamp(2rem,3vw + 1rem,2.6rem); margin-top:.15rem;}
+  .money-card .note{font-size:.86rem; opacity:.85; margin-top:.2rem;}
+  .money-card .cta{display:block; margin-top:.9rem; text-align:center; background:rgba(255,255,255,.18); border-radius:var(--radius-m); padding:.75rem; font-weight:700;}
+  .speak-btn{width:42px; height:42px; border-radius:50%; background:rgba(255,255,255,.2); display:grid; place-items:center; flex-shrink:0;}
+  .speak-btn:hover{background:rgba(255,255,255,.32);}
+
+  /* ---------- Stepper ---------- */
+  .stepper{display:flex; align-items:center; gap:0;}
+  .stepper .seg{flex:1; height:5px; background:var(--border); border-radius:3px; margin:0 3px; position:relative; overflow:hidden;}
+  .stepper .seg i{position:absolute; inset:0; background:var(--copper); border-radius:3px; transform:scaleX(0); transform-origin:left; transition:transform .35s var(--ease);}
+  .stepper .seg.done i, .stepper .seg.active i{transform:scaleX(1);}
+  .stepper-labels{display:flex; justify-content:space-between; margin-top:.4rem; font-size:.68rem; font-weight:700; color:var(--ink-faint);}
+  .stepper-labels span.active{color:var(--copper);}
+
+  /* ---------- Tables / lists ---------- */
+  table.kc-table{width:100%; border-collapse:collapse; font-size:.9rem;}
+  table.kc-table th{font-size:.7rem; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-faint); text-align:left; padding-bottom:.5rem;}
+  table.kc-table td{padding:.6rem 0; border-top:1px solid var(--border);}
+  .row-link{font-weight:700; color:var(--copper-ink); text-decoration:underline;}
+  .list-item{display:flex; align-items:center; justify-content:between; gap:.6rem; padding:.7rem .8rem; border-radius:var(--radius-m); background:var(--panel-2);}
+  .list-item + .list-item{margin-top:.5rem;}
+
+  .badge{display:inline-flex; align-items:center; gap:.35rem; font-size:.7rem; font-weight:700; padding:.28rem .55rem; border-radius:999px;}
+  .badge.sync-synced{background:color-mix(in srgb, var(--verdigris) 16%, transparent); color:var(--verdigris);}
+  .badge.sync-pending{background:color-mix(in srgb, var(--ochre) 18%, transparent); color:var(--copper-ink);}
+  .badge.sync-failed{background:color-mix(in srgb, #b3261e 15%, transparent); color:#b3261e;}
+  .badge.auth{background:color-mix(in srgb, var(--verdigris) 16%, transparent); color:var(--verdigris);}
+  .badge.notauth{background:var(--panel-2); border:1px solid var(--border); color:var(--ink-dim);}
+
+  /* ---------- Empty / loading states ---------- */
+  .empty{border-radius:var(--radius-m); background:var(--panel-2); padding:1.6rem 1rem; text-align:center;}
+  .empty p.t{font-weight:700; margin:0 0 .3rem;}
+  .empty p.b{margin:0; font-size:.88rem; color:var(--ink-dim);}
+
+  /* ---------- Back / top bar for subpages ---------- */
+  .subhead{display:flex; align-items:center; justify-content:space-between; margin-bottom:.85rem;}
+  .backlink{display:inline-flex; align-items:center; gap:.4rem; background:var(--panel-2); border-radius:999px; padding:.5rem .85rem; font-size:.86rem; font-weight:700;}
+
+  /* ---------- Journey timeline ---------- */
+  ol.trace{list-style:none; margin:0; padding:0;}
+  ol.trace li{display:flex; gap:.75rem;}
+  .trace-dot{width:28px; height:28px; border-radius:50%; display:grid; place-items:center; font-size:.72rem; font-weight:700; flex-shrink:0;}
+  .trace-dot.done{background:var(--verdigris); color:#fff;}
+  .trace-dot.pending{background:var(--panel-2); border:1px solid var(--border); color:var(--ink-faint);}
+  .trace-line{width:2px; flex:1; background:var(--border); min-height:14px;}
+  .trace-line.done{background:var(--verdigris);}
+  ol.trace li p{margin:0 0 1rem; font-weight:700;}
+
+  /* ---------- Price board rows ---------- */
+  .price-row{display:flex; align-items:center; gap:.8rem; padding:.75rem; border-radius:var(--radius-m); background:var(--panel); border:1px solid var(--border); box-shadow:var(--shadow);}
+  .mat-icon{width:46px; height:46px; border-radius:12px; background:var(--panel-2); display:grid; place-items:center; flex-shrink:0; color:var(--copper);}
+  .price-row .amt{font-family:var(--font-display); font-weight:700; font-size:1.1rem; white-space:nowrap;}
+
+  /* ---------- Leaflet recycler map ---------- */
+  .map-frame{position:relative; z-index:0; isolation:isolate; height:380px; min-height:300px; border-radius:var(--radius-l); background:var(--panel); border:1px solid var(--border); overflow:hidden;}
+  .portal-leaflet-map{width:100%; height:100%; background:var(--bg-2); font-family:var(--font-body);}
+  .portal-leaflet-map .leaflet-popup-content-wrapper,.portal-leaflet-map .leaflet-popup-tip{background:var(--panel); color:var(--ink);}
+  .portal-leaflet-map .leaflet-popup-content{line-height:1.5;}
+  .portal-leaflet-map .leaflet-popup-content p{margin:.3rem 0; color:var(--ink-dim);}
+  .portal-leaflet-pin{background:transparent; border:0;}
+  .portal-map-loading{display:grid; place-items:center; width:100%; height:100%; margin:0; padding:1rem; color:var(--ink-dim); font-weight:600; text-align:center;}
+  @media (max-width:559px){ .map-frame{height:320px; min-height:300px;} }
+
+  /* ---------- Filter chips ---------- */
+  .chips{display:flex; gap:.5rem; flex-wrap:wrap;}
+  .chip{padding:.5rem .95rem; border-radius:999px; font-size:.84rem; font-weight:700; background:var(--panel-2);}
+  .chip[aria-pressed="true"]{background:var(--ink); color:var(--bg);}
+  html[data-theme="dark"] .chip[aria-pressed="true"]{background:var(--copper); color:#1a1006;}
+
+  /* ---------- Tab bar ---------- */
+  .tabbar{position:fixed; left:0; right:0; bottom:0; z-index:50; background:color-mix(in srgb, var(--panel) 92%, transparent); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border-top:1px solid var(--border); padding:.4rem .5rem calc(.4rem + env(safe-area-inset-bottom,0px));}
+  .tabbar-inner{max-width:900px; margin:0 auto; display:grid; grid-template-columns:repeat(5,1fr); align-items:end; gap:2px;}
+  .tab-btn{display:flex; flex-direction:column; align-items:center; gap:.2rem; padding:.4rem 0; border-radius:12px; color:var(--ink-faint); font-size:.66rem; font-weight:700;}
+  .tab-btn .icon{width:20px; height:20px;}
+  .tab-btn.active{color:var(--copper);}
+  .tab-btn.scan-tab{margin-top:-22px;}
+  .tab-btn.scan-tab .icon-wrap{width:48px; height:48px; border-radius:50%; background:var(--ink); color:#fff; display:grid; place-items:center; box-shadow:var(--shadow-lg); margin-bottom:.15rem;}
+  html[data-theme="dark"] .tab-btn.scan-tab .icon-wrap{background:var(--copper); color:#1a1006;}
+  .tab-btn.scan-tab .icon{width:22px; height:22px;}
+
+  /* ---------- Scan flow ---------- */
+  .field{margin-bottom:1rem;}
+  .field label{display:block; font-size:.8rem; font-weight:700; color:var(--ink-dim); margin-bottom:.35rem;}
+  .field input, .field select{width:100%; padding:.8rem .9rem; border-radius:var(--radius-s); border:1.5px solid var(--border-strong); background:var(--panel); font-size:1rem;}
+  .field input:focus, .field select:focus{border-color:var(--copper);}
+  .mat-pick{display:grid; grid-template-columns:repeat(2,1fr); gap:.6rem;}
+  @media (min-width:560px){ .mat-pick{grid-template-columns:repeat(4,1fr); } }
+  .mat-pick button{display:flex; flex-direction:column; align-items:center; gap:.4rem; padding:.9rem .5rem; border-radius:var(--radius-m); border:1.5px solid var(--border); background:var(--panel);}
+  .mat-pick button[aria-pressed="true"]{border-color:var(--copper); background:color-mix(in srgb, var(--copper) 8%, var(--panel));}
+  .mat-pick .icon{width:26px; height:26px; color:var(--copper);}
+  .rec-pick{display:flex; flex-direction:column; gap:.55rem;}
+  .rec-pick button{display:flex; align-items:center; justify-content:space-between; gap:.6rem; padding:.85rem; border-radius:var(--radius-m); border:1.5px solid var(--border); background:var(--panel); text-align:left;}
+  .rec-pick button[aria-pressed="true"]{border-color:var(--copper); background:color-mix(in srgb, var(--copper) 8%, var(--panel));}
+  .qr-fake{width:140px; height:140px; margin:0 auto; background:#fff; border-radius:8px; padding:8px; display:grid; grid-template-columns:repeat(7,1fr); grid-template-rows:repeat(7,1fr); gap:2px;}
+  .qr-fake i{background:#141F1B; border-radius:1px;}
+  .qr-fake i.off{background:transparent;}
+
+  /* Keep the icon-first layout readable when translated labels wrap. */
+  #view > *{min-width:0;}
+  #view h1, #view h2, #view h3, #view p{overflow-wrap:anywhere;}
+  #view .page-title{line-height:1.12; text-wrap:balance;}
+  #view .eyebrow{line-height:1.35;}
+  #view .qn-card{min-width:0;}
+  #view .qn-card .icon{display:block; margin-bottom:.1rem;}
+  #view .qn-card p.lbl{font-size:.9rem; line-height:1.25;}
+  #view .qn-card p.sub{line-height:1.35; overflow-wrap:anywhere;}
+  #view .list-item{min-width:0;}
+  #view .list-item > a{min-width:0;}
+  #view .list-item .badge{flex:0 0 auto;}
+  #view .btn{max-width:100%; text-align:center; white-space:normal; line-height:1.25;}
+  #view .price-row{min-width:0;}
+  #view .price-row > div{min-width:0;}
+  #view .price-row .amt{font-size:1rem; text-align:right;}
+  #view .mat-icon{flex:0 0 46px;}
+  @media (max-width:559px){
+    main{padding:1rem .8rem 1.5rem;}
+    .grid2{gap:.8rem;}
+    .panel-pad{padding:1rem;}
+    .page-title{font-size:clamp(1.35rem,6vw,1.8rem);}
+    .cta-scan{padding:1rem;}
+    .cta-scan .ic{width:50px; height:50px; border-radius:14px;}
+    .quicknav{gap:.6rem;}
+    .qn-card{padding:.8rem;}
+    .money-card{padding:1rem;}
+    .price-row{gap:.55rem; padding:.65rem;}
+    .price-row .amt{font-size:.9rem;}
+    .price-row .speak-btn{width:38px; height:38px;}
+  }
+</style>
+</head>
+<body>
+
+<div id="kc-nav"></div>
+<div style="position:fixed; top:82px; right:1rem; z-index:45;">
+  <button class="logout-btn" type="button" onclick="window.location.href='login.html'">Logout</button>
+</div>
+<div class="conn-banner" id="connBanner" style="display:none; padding-bottom:.6rem;"></div>
+
+<main id="view"></main>
+
+<script src="../js/nav.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+<nav class="tabbar" aria-label="Collector navigation">
+  <div class="tabbar-inner" id="tabbarInner"></div>
+</nav>
+
+<script>
+(function(){
+"use strict";
+
+/* =========================================================================
+   i18n — a compact trilingual dictionary for the app chrome (nav, headers,
+   status words). Longer body copy stays in English across languages, same
+   as the reference site keeps most marketing copy per-locale but core nav
+   consistent in structure.
+   ========================================================================= */
+var DICT = {
+  en:{ collectorIdentity:"Collector Portal", home:"Home", lots:"Lots", map:"Recyclers", earnings:"Earnings", scan:"Scan",
+    greetLine:"Welcome back", dashboardTitle:"Collector Dashboard", scanSell:"Scan & Sell", scanSellSub:"Photo → fair price → sold",
+    checkPrice:"Check Price", findRecycler:"Find Recycler", myLots:"My Lots", myEarnings:"My Earnings", recentLots:"Recent Lots",
+    viewAll:"View all", loadingLots:"Loading your lots…", noLotsTitle:"No lots yet", noLotsBody:"Start your first scan to create a lot.",
+    startWithPhoto:"Start with a photo", todayEarn:"Today's Earnings", journey:"Lot Journey", openLedger:"Open Ledger",
+    continueCapture:"Continue", offlineBody:"You're offline — everything you do is saved and will sync automatically.",
+    home_:"Home", earningsTitle:"Earnings", thisMonth:"This month", salesThisMonth:"Sales this month", stillToBePaid:"Still to be paid",
+    perMaterial:"Per material", noSalesMonth:"No sales this month yet.", receipts:"Receipts", receiptsEmpty:"No receipts yet.",
+    cash:"Cash", upi:"UPI", stateCompleted:"Paid", statePending:"Pending", myLotsTitle:"My Lots", lotsEmpty:"You haven't created any lots yet.",
+    awaitingQuote:"Awaiting quote", newLot:"New lot", backToLots:"Lots", openingLot:"Opening lot…", lotNotFound:"Lot not found",
+    lotNotFoundBody:"We couldn't find that lot on this device.", scanNewLot:"Scan new lot", materialLabel:"Material", quoteLabel:"Quote",
+    finalLabel:"Final price", authorizedBadge:"Authorized", notAuthorized:"Not authorized", qrPassport:"e‑Waste Passport",
+    failedSyncNote:"This lot couldn't sync yet.", mapTitle:"Find a Recycler", filterAll:"All", mapLoading:"Loading map…", mapUnavailable:"Map unavailable. Check your internet connection.",
+    mapLotsNote:"You have {count} lot(s) tracked on this device.", priceBoardTitle:"Today's Rates", priceBoardSub:"Fair prices for your area, updated regularly.",
+    indicative:"Indicative — confirm at pickup", listenPrice:"Listen", perKg:"/kg", scanSellResume:"Resume at {phase}",
+    weightLabel:"Weight (kg)", pickMaterial:"Select material", pickRecycler:"Choose a recycler", pickPayment:"Payment method",
+    schedule:"Schedule pickup", handoverComplete:"Handover complete", createLot:"Create lot", next:"Next", back:"Back",
+    submitForQuote:"Get quote", acceptQuote:"Accept & continue", confirmSchedule:"Confirm schedule", markPaid:"Mark as paid",
+    lotCreated:"Lot created", traceCollected:"Collected", traceListed:"Listed", traceMatched:"Buyer matched", traceScheduled:"Pickup scheduled", traceHandover:"Handover complete",
+    stepPhoto:"Photo", stepWeight:"Weight", stepPrice:"Price", stepRecycler:"Recycler", stepSchedule:"Schedule", stepHandover:"Handover", col_authorized_nearby:"authorized nearby", col_lots_count:"lot(s)", col_sales_today:"sale(s) today", col_no_sales_today:"No sales yet today", col_lot:"Lot", col_no_lot:"No lot in progress.", col_speak:"Speak" },
+  hi:{ collectorIdentity:"कलेक्टर पोर्टल", home:"होम", lots:"लॉट्स", map:"रिसायकलर", earnings:"कमाई", scan:"स्कैन",
+    greetLine:"वापसी पर स्वागत है", dashboardTitle:"कलेक्टर डैशबोर्ड", scanSell:"स्कैन करें और बेचें", scanSellSub:"फोटो → उचित दाम → बिक्री",
+    checkPrice:"दाम देखें", findRecycler:"रिसायकलर खोजें", myLots:"मेरे लॉट्स", myEarnings:"मेरी कमाई", recentLots:"हाल के लॉट्स",
+    viewAll:"सभी देखें", loadingLots:"लॉट्स लोड हो रहे हैं…", noLotsTitle:"अभी कोई लॉट नहीं", noLotsBody:"लॉट बनाने के लिए पहला स्कैन शुरू करें।",
+    startWithPhoto:"फोटो से शुरू करें", todayEarn:"आज की कमाई", journey:"लॉट यात्रा", openLedger:"लेजर खोलें",
+    continueCapture:"जारी रखें", offlineBody:"आप ऑफ़लाइन हैं — आपका काम सुरक्षित है और वापस आते ही सिंक हो जाएगा।",
+    earningsTitle:"कमाई", thisMonth:"इस महीने", salesThisMonth:"इस महीने की बिक्री", stillToBePaid:"अभी भुगतान बाकी",
+    perMaterial:"सामग्री अनुसार", noSalesMonth:"इस महीने अभी कोई बिक्री नहीं।", receipts:"रसीदें", receiptsEmpty:"अभी कोई रसीद नहीं।",
+    cash:"नकद", upi:"यूपीआई", stateCompleted:"भुगतान हुआ", statePending:"लंबित", myLotsTitle:"मेरे लॉट्स", lotsEmpty:"आपने अभी कोई लॉट नहीं बनाया।",
+    awaitingQuote:"दाम का इंतज़ार", newLot:"नया लॉट", backToLots:"लॉट्स", openingLot:"लॉट खोला जा रहा है…", lotNotFound:"लॉट नहीं मिला",
+    lotNotFoundBody:"यह लॉट इस डिवाइस पर नहीं मिला।", scanNewLot:"नया लॉट स्कैन करें", materialLabel:"सामग्री", quoteLabel:"दाम",
+    finalLabel:"अंतिम दाम", authorizedBadge:"अधिकृत", notAuthorized:"अनधिकृत", qrPassport:"ई-वेस्ट पासपोर्ट",
+    failedSyncNote:"यह लॉट अभी सिंक नहीं हो पाया।", mapTitle:"रिसायकलर खोजें", filterAll:"सभी", mapLoading:"मानचित्र लोड हो रहा है…", mapUnavailable:"मानचित्र उपलब्ध नहीं है। इंटरनेट कनेक्शन जांचें।",
+    mapLotsNote:"इस डिवाइस पर {count} लॉट ट्रैक किए गए हैं।", priceBoardTitle:"आज के दाम", priceBoardSub:"आपके क्षेत्र के उचित दाम, नियमित रूप से अपडेट।",
+    indicative:"संकेतात्मक — पिकअप पर पुष्टि करें", listenPrice:"सुनें", perKg:"/किग्रा", scanSellResume:"{phase} से जारी रखें",
+    weightLabel:"वज़न (किग्रा)", pickMaterial:"सामग्री चुनें", pickRecycler:"रिसायकलर चुनें", pickPayment:"भुगतान का तरीका",
+    schedule:"पिकअप शेड्यूल करें", handoverComplete:"हैंडओवर पूर्ण", createLot:"लॉट बनाएं", next:"आगे", back:"पीछे",
+    submitForQuote:"दाम जानें", acceptQuote:"स्वीकार करें और जारी रखें", confirmSchedule:"शेड्यूल पुष्टि करें", markPaid:"भुगतान हुआ चिह्नित करें",
+    lotCreated:"लॉट बन गया", traceCollected:"संग्रहित", traceListed:"सूचीबद्ध", traceMatched:"खरीदार मिला", traceScheduled:"पिकअप तय", traceHandover:"हैंडओवर पूर्ण",
+    stepPhoto:"फोटो", stepWeight:"वज़न", stepPrice:"दाम", stepRecycler:"रिसायकलर", stepSchedule:"शेड्यूल", stepHandover:"हैंडओवर", col_authorized_nearby:"पास के अधिकृत रिसाइकलर", col_lots_count:"लॉट", col_sales_today:"आज की बिक्री", col_no_sales_today:"आज अभी कोई बिक्री नहीं", col_lot:"लॉट", col_no_lot:"कोई लॉट चल नहीं रहा है।", col_speak:"सुनें" },
+  mr:{ collectorIdentity:"कलेक्टर पोर्टल", home:"होम", lots:"लॉट्स", map:"रिसायकलर", earnings:"कमाई", scan:"स्कॅन",
+    greetLine:"पुन्हा स्वागत आहे", dashboardTitle:"कलेक्टर डॅशबोर्ड", scanSell:"स्कॅन करा आणि विका", scanSellSub:"फोटो → योग्य किंमत → विक्री",
+    checkPrice:"किंमत पाहा", findRecycler:"रिसायकलर शोधा", myLots:"माझे लॉट्स", myEarnings:"माझी कमाई", recentLots:"अलीकडील लॉट्स",
+    viewAll:"सर्व पाहा", loadingLots:"लॉट्स लोड होत आहेत…", noLotsTitle:"अजून लॉट नाही", noLotsBody:"लॉट तयार करण्यासाठी पहिला स्कॅन सुरू करा.",
+    startWithPhoto:"फोटोने सुरुवात करा", todayEarn:"आजची कमाई", journey:"लॉट प्रवास", openLedger:"लेजर उघडा",
+    continueCapture:"सुरू ठेवा", offlineBody:"तुम्ही ऑफलाइन आहात — तुमचे काम जतन झाले आहे आणि परत आल्यावर सिंक होईल.",
+    earningsTitle:"कमाई", thisMonth:"या महिन्यात", salesThisMonth:"या महिन्यातील विक्री", stillToBePaid:"अजून भरणे बाकी",
+    perMaterial:"साहित्यानुसार", noSalesMonth:"या महिन्यात अजून विक्री नाही.", receipts:"पावत्या", receiptsEmpty:"अजून पावती नाही.",
+    cash:"रोख", upi:"यूपीआय", stateCompleted:"भरणा झाला", statePending:"प्रलंबित", myLotsTitle:"माझे लॉट्स", lotsEmpty:"तुम्ही अजून लॉट तयार केलेला नाही.",
+    awaitingQuote:"किंमतीची वाट पाहत आहे", newLot:"नवीन लॉट", backToLots:"लॉट्स", openingLot:"लॉट उघडत आहे…", lotNotFound:"लॉट सापडला नाही",
+    lotNotFoundBody:"हा लॉट या डिव्हाइसवर सापडला नाही.", scanNewLot:"नवीन लॉट स्कॅन करा", materialLabel:"साहित्य", quoteLabel:"किंमत",
+    finalLabel:"अंतिम किंमत", authorizedBadge:"अधिकृत", notAuthorized:"अनधिकृत", qrPassport:"ई-वेस्ट पासपोर्ट",
+    failedSyncNote:"हा लॉट अजून सिंक झालेला नाही.", mapTitle:"रिसायकलर शोधा", filterAll:"सर्व", mapLoading:"नकाशा लोड होत आहे…", mapUnavailable:"नकाशा उपलब्ध नाही. इंटरनेट कनेक्शन तपासा.",
+    mapLotsNote:"या डिव्हाइसवर {count} लॉट्स ट्रॅक केले आहेत.", priceBoardTitle:"आजचे दर", priceBoardSub:"तुमच्या भागातील योग्य दर, नियमित अद्ययावत.",
+    indicative:"सूचक — पिकअपच्या वेळी खात्री करा", listenPrice:"ऐका", perKg:"/किलो", scanSellResume:"{phase} पासून सुरू ठेवा",
+    weightLabel:"वजन (किलो)", pickMaterial:"साहित्य निवडा", pickRecycler:"रिसायकलर निवडा", pickPayment:"पेमेंट पद्धत",
+    schedule:"पिकअप ठरवा", handoverComplete:"हस्तांतरण पूर्ण", createLot:"लॉट तयार करा", next:"पुढे", back:"मागे",
+    submitForQuote:"किंमत मिळवा", acceptQuote:"स्वीकारा आणि पुढे जा", confirmSchedule:"वेळ निश्चित करा", markPaid:"भरणा झाला असे चिन्हांकित करा",
+    lotCreated:"लॉट तयार झाला", traceCollected:"गोळा केले", traceListed:"सूचीबद्ध", traceMatched:"खरेदीदार जुळला", traceScheduled:"पिकअप ठरले", traceHandover:"हस्तांतरण पूर्ण",
+    stepPhoto:"फोटो", stepWeight:"वजन", stepPrice:"किंमत", stepRecycler:"रिसायकलर", stepSchedule:"वेळापत्रक", stepHandover:"हस्तांतरण", col_authorized_nearby:"जवळचे अधिकृत रिसायकलर", col_lots_count:"लॉट्स", col_sales_today:"आजची विक्री", col_no_sales_today:"आज अजून विक्री नाही", col_lot:"लॉट", col_no_lot:"सध्या कोणताही लॉट सुरू नाही.", col_speak:"ऐका" }
+};
+var lang = "en";
+try{ var savedLang = localStorage.getItem("kc-lang"); if(DICT[savedLang]) lang = savedLang; }catch(e){}
+function tt(key, vars){
+  var s = (DICT[lang] && DICT[lang][key]) || DICT.en[key] || key;
+  if(vars) for(var k in vars) s = s.replace("{"+k+"}", vars[k]);
+  return s;
+}
+
+/* =========================================================================
+   Icons — small inline SVGs standing in for the lucide-react set used
+   across the original pages (Camera, BadgeIndianRupee, MapPin, Package,
+   Wallet, ArrowRight/Left, ShieldCheck, Check).
+   ========================================================================= */
+var ICON = {
+  camera:'<path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13.5" r="3.3"/>',
+  rupee:'<path d="M6 4h12M6 9h12M6 4c4 0 7 1.6 7 4.5S10 13 6 13h9l-9 8"/>',
+  pin:'<path d="M12 21s7-7.2 7-12a7 7 0 1 0-14 0c0 4.8 7 12 7 12z"/><circle cx="12" cy="9" r="2.6"/>',
+  package:'<path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v9l9 5 9-5V8"/><path d="M12 13v9"/>',
+  wallet:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><circle cx="16.5" cy="14" r="1.2"/>',
+  arrowR:'<path d="M5 12h14M13 6l6 6-6 6"/>',
+  arrowL:'<path d="M19 12H5M11 18l-6-6 6-6"/>',
+  shield:'<path d="M12 3l7 4v6c0 4.5-3 7.5-7 8-4-.5-7-3.5-7-8V7z"/><path d="M9 12l2 2 4-4"/>',
+  check:'<path d="M20 6L9 17l-5-5"/>',
+  speaker:'<path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  home:'<path d="M4 10.5L12 4l8 6.5V20a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/>',
+  qr:'<rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><path d="M14 14h3v3M20 14v3h-3M14 20h6"/>',
+  laptop:'<rect x="4" y="5" width="16" height="10" rx="1"/><path d="M2 19h20"/>',
+  cable:'<path d="M8 3v4a4 4 0 0 0 4 4 4 4 0 0 1 4 4v6"/><circle cx="8" cy="3" r="1.4"/><circle cx="16" cy="21" r="1.4"/>',
+  battery:'<rect x="3" y="8" width="16" height="8" rx="1.5"/><path d="M21 10v4"/>'
+};
+function icon(name, cls){ return '<svg class="icon '+(cls||'')+'" viewBox="0 0 24 24">'+ICON[name]+'</svg>'; }
+
+/* =========================================================================
+   Data layer — mirrors lib/db, lib/capture, lib/seed from the original app.
+   Persists to localStorage under kc_* keys; dispatches sync events so every
+   view re-reads the same source of truth after a change.
+   ========================================================================= */
+var LS_LOTS = "kc_lots", LS_TXNS = "kc_txns", LS_CAPTURE = "kc_capture";
+var KC_SYNC_EVENT = "kc:sync", KC_CAPTURE_EVENT = "kc:capture";
+
+var MATERIALS = [
+  { id:"PCB", label:"Printed Circuit Board", icon:"laptop", priceMin:180, priceMax:260, updatedAt: daysAgoISO(0) },
+  { id:"Copper Cable", label:"Copper Cable", icon:"cable", priceMin:410, priceMax:480, updatedAt: daysAgoISO(1) },
+  { id:"Li-ion Battery", label:"Li-ion Battery", icon:"battery", priceMin:60, priceMax:95, updatedAt: daysAgoISO(4) },
+  { id:"Mixed Metal", label:"Mixed Metal Casing", icon:"package", priceMin:28, priceMax:42, updatedAt: daysAgoISO(2) }
+];
+function materialById(id){ return MATERIALS.find(function(m){return m.id===id;}) || MATERIALS[0]; }
+function daysAgoISO(n){ var d=new Date(); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10); }
+function daysSinceStated(iso){ try{ var then=new Date(iso+"T00:00:00"); var now=new Date(); return Math.floor((now-then)/86400000); }catch(e){ return null; } }
+
+var RECYCLERS = [
+  { id:"R1", name:"Andheri GreenCycle Hub", area:"Andheri, Mumbai", distanceKm:2.4, authorized:true, materials:["PCB","cable","battery"], lat:19.1197, lng:72.8468 },
+  { id:"R2", name:"Kurla Metal Works", area:"Kurla, Mumbai", distanceKm:4.1, authorized:true, materials:["cable","battery"], lat:19.0726, lng:72.8845 },
+  { id:"R3", name:"Dadar Scrap Traders", area:"Dadar, Mumbai", distanceKm:5.6, authorized:false, materials:["PCB"], lat:19.0178, lng:72.8478 },
+  { id:"R4", name:"Bandra e‑Recyclers", area:"Bandra, Mumbai", distanceKm:3.2, authorized:true, materials:["PCB","battery"], lat:19.0596, lng:72.8295 }
+];
+var INDIA_MAP_POINTS = "142,19 120,28 113,50 132,59 131,76 128,97 138,115 156,125 145,139 139,158 124,175 112,195 96,213 76,220 60,223 52,242 60,258 74,274 69,291 49,290 30,295 29,309 47,322 59,326 37,327 48,345 64,362 86,360 99,342 103,345 110,367 106,390 108,412 113,434 117,458 126,479 136,500 142,522 152,544 164,564 171,586 177,607 193,625 212,614 228,602 227,594 242,580 245,562 248,539 255,517 252,495 252,472 269,464 288,453 299,436 317,420 334,405 350,386 371,375 377,355 394,342 414,344 416,325 411,306 407,287 402,275 406,263 401,247 417,252 427,266 451,268 473,268 463,286 458,305 470,302 479,312 487,329 494,312 498,291 513,281 517,261 525,240 537,222 556,217 560,202 550,191 541,178 526,178 505,179 487,193 474,210 457,218 461,231 438,234 417,235 408,218 394,214 395,236 379,246 359,243 340,239 323,227 302,227 282,218 262,207 247,196 256,176 248,162 231,150 221,136 221,123 236,117 225,102 235,86 245,66 234,52 213,55 194,56 178,42 164,24";
+var NETWORK_HUBS = [
+  { key:"delhi", name:"Delhi NCR", x:192.5, y:214, side:"r" },
+  { key:"ahmedabad", name:"Ahmedabad", x:103, y:322, side:"r" },
+  { key:"mumbai", name:"Mumbai", x:109, y:401, side:"l" },
+  { key:"pune", name:"Pune", x:127, y:415, side:"r" },
+  { key:"hyderabad", name:"Hyderabad", x:212, y:439, side:"r" },
+  { key:"bengaluru", name:"Bengaluru", x:195.5, y:526, side:"l" },
+  { key:"chennai", name:"Chennai", x:245, y:524, side:"r" },
+  { key:"kolkata", name:"Kolkata", x:395, y:331, side:"r" }
+];
+
+function loadLots(){ try{ return JSON.parse(localStorage.getItem(LS_LOTS)||"[]"); }catch(e){ return []; } }
+function saveLots(l){ localStorage.setItem(LS_LOTS, JSON.stringify(l)); window.dispatchEvent(new Event(KC_SYNC_EVENT)); }
+function loadTxns(){ try{ return JSON.parse(localStorage.getItem(LS_TXNS)||"[]"); }catch(e){ return []; } }
+function saveTxns(t){ localStorage.setItem(LS_TXNS, JSON.stringify(t)); window.dispatchEvent(new Event(KC_SYNC_EVENT)); }
+function loadCapture(){ try{ return JSON.parse(localStorage.getItem(LS_CAPTURE)||"null"); }catch(e){ return null; } }
+function saveCapture(c){ if(c) localStorage.setItem(LS_CAPTURE, JSON.stringify(c)); else localStorage.removeItem(LS_CAPTURE); window.dispatchEvent(new Event(KC_CAPTURE_EVENT)); }
+
+var PHASES = ["stepPhoto","stepWeight","stepPrice","stepRecycler","stepSchedule","stepHandover"];
+function phaseIndex(capture){ return capture ? Math.min(capture.phase||0, PHASES.length-1) : 0; }
+
+function inr(n){ return "₹" + Math.round(n||0).toLocaleString("en-IN"); }
+function localDayKey(d){ d = d||new Date(); return d.toISOString().slice(0,10); }
+function monthKeyOf(iso){ return (iso||"").slice(0,7); }
+function formatDate(iso, l){ try{ return new Date(iso).toLocaleDateString(l==="en"?"en-IN":l, {day:"numeric", month:"short", year:"numeric"}); }catch(e){ return iso; } }
+function formatDay(iso, l){ try{ return new Date(iso).toLocaleDateString(l==="en"?"en-IN":l, {day:"numeric", month:"short"}); }catch(e){ return iso; } }
+
+function summarizeLedger(txns, now){
+  now = now || new Date();
+  var today = localDayKey(now), month = monthKeyOf(localDayKey(now));
+  var out = { today:0, todayCount:0, monthCompleted:0, monthCount:0, pending:0, monthLabel: now.toLocaleDateString(lang==="en"?"en-IN":lang,{month:"long", year:"numeric"}) };
+  txns.forEach(function(t){
+    if(t.state==="completed" && t.date===today){ out.today += t.amount; out.todayCount++; }
+    if(t.state==="completed" && monthKeyOf(t.date)===month){ out.monthCompleted += t.amount; out.monthCount++; }
+    if(t.state==="pending"){ out.pending += t.amount; }
+  });
+  return out;
+}
+function statusKey(status){
+  return { "Collected":"traceCollected", "Listed":"traceListed", "Buyer matched":"traceMatched", "Pickup scheduled":"traceScheduled", "Handover complete":"traceHandover" }[status] || "traceCollected";
+}
+
+/* Seed a little demo data on first run, so the portal isn't empty. */
+(function seedOnce(){
+  if(localStorage.getItem(LS_LOTS) !== null) return;
+  var l1 = { id:"LOT-2031", material:"PCB", weightKg:3.2, status:"Handover complete", syncState:"synced", createdAt:daysAgoISO(6), quote:220, finalPrice:704, recyclerId:"R1", handoverId:"HX-9182" };
+  var l2 = { id:"LOT-2044", material:"Copper Cable", weightKg:1.8, status:"Pickup scheduled", syncState:"pending", createdAt:daysAgoISO(2), quote:445, recyclerId:"R2" };
+  var l3 = { id:"LOT-2050", material:"Li-ion Battery", weightKg:0.9, status:"Listed", syncState:"synced", createdAt:daysAgoISO(0) };
+  saveLots([l3,l2,l1]);
+  var t1 = { id:"TX-1", lotId:"LOT-2031", material:"PCB", weightKg:3.2, amount:704, method:"UPI", state:"completed", date:daysAgoISO(6) };
+  var t2 = { id:"TX-2", lotId:"LOT-1980", material:"Copper Cable", weightKg:2.4, amount:1080, method:"Cash", state:"completed", date:daysAgoISO(0) };
+  saveTxns([t2,t1]);
+})();
+
+/* =========================================================================
+   Small UI helpers
+   ========================================================================= */
+function h(strings){ var d=document.createElement("div"); d.innerHTML=strings; return d.firstElementChild; }
+function speak(text){
+  try{
+    if(!("speechSynthesis" in window)) return;
+    var u = new SpeechSynthesisUtterance(text);
+    u.lang = lang==="hi" ? "hi-IN" : lang==="mr" ? "mr-IN" : "en-IN";
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
+  }catch(e){}
+}
+function speakBtn(text, label){
+  return '<button class="speak-btn touch-min" data-speak="'+encodeURIComponent(text)+'" aria-label="'+label+'">'+icon("speaker")+'</button>';
+}
+function countUp(el, to){
+  var from = 0, dur = 700, start = null;
+  function step(ts){ if(!start) start=ts; var p = Math.min(1, (ts-start)/dur); el.textContent = "₹" + Math.round(from + (to-from)*p).toLocaleString("en-IN"); if(p<1) requestAnimationFrame(step); }
+  requestAnimationFrame(step);
+}
+
+/* =========================================================================
+   Router
+   ========================================================================= */
+var TABS = [
+  { key:"home", route:"#/", icon:"home" },
+  { key:"lots", route:"#/lots", icon:"package" },
+  { key:"scan", route:"#/scan", icon:"camera", isScan:true },
+  { key:"map", route:"#/map", icon:"pin" },
+  { key:"earnings", route:"#/earnings", icon:"wallet" }
+];
+function renderTabbar(){
+  var current = location.hash || "#/";
+  var base = current.split("?")[0];
+  var activeKey = "home";
+  if(base.indexOf("#/lots")===0) activeKey="lots";
+  else if(base.indexOf("#/scan")===0) activeKey="scan";
+  else if(base.indexOf("#/map")===0) activeKey="map";
+  else if(base.indexOf("#/earnings")===0 || base.indexOf("#/value")===0) activeKey = base.indexOf("#/value")===0 ? "" : "earnings";
+  var html = TABS.map(function(t){
+    if(t.isScan){
+      return '<a class="tab-btn scan-tab'+(activeKey===t.key?" active":"")+'" href="'+t.route+'"><span class="icon-wrap">'+icon(t.icon)+'</span>'+tt(t.key)+'</a>';
+    }
+    return '<a class="tab-btn'+(activeKey===t.key?" active":"")+'" href="'+t.route+'">'+icon(t.icon)+'<span>'+tt(t.key)+'</span></a>';
+  }).join("");
+  document.getElementById("tabbarInner").innerHTML = html;
+}
+
+function renderConnBanner(){
+  var el = document.getElementById("connBanner");
+  if(!navigator.onLine){
+    el.style.display = "block";
+    el.innerHTML = '<span class="pill warn"><span class="dot"></span>'+tt("offlineBody")+'</span>';
+  } else {
+    el.style.display = "none";
+  }
+}
+
+var mapAnimationCleanup = null;
+function go(){
+  var hash = location.hash || "#/";
+  var view = document.getElementById("view");
+  if(mapAnimationCleanup){ mapAnimationCleanup(); mapAnimationCleanup = null; }
+  view.innerHTML = "";
+  renderTabbar();
+  renderConnBanner();
+
+  if(hash === "#/" || hash === "") view.appendChild(ViewHome());
+  else if(hash === "#/lots") view.appendChild(ViewLots());
+  else if(hash.indexOf("#/lots/") === 0) view.appendChild(ViewLotDetail(decodeURIComponent(hash.slice(7))));
+  else if(hash === "#/map") view.appendChild(ViewMap());
+  else if(hash === "#/earnings") view.appendChild(ViewEarnings());
+  else if(hash === "#/value") view.appendChild(ViewValue());
+  else if(hash === "#/scan") view.appendChild(ViewScan());
+  else view.appendChild(ViewHome());
+
+  window.scrollTo(0,0);
+}
+
+/* =========================================================================
+   Views
+   ========================================================================= */
+function ViewHome(){
+  var lots = loadLots(), txns = loadTxns(), capture = loadCapture();
+  var totals = summarizeLedger(txns, new Date());
+  var authorizedNearby = RECYCLERS.filter(function(r){return r.authorized;}).length;
+  var pcb = materialById("PCB");
+  var phase = phaseIndex(capture);
+  var phaseLabel = tt(PHASES[phase]);
+
+  var wrap = h('<div class="stack"></div>');
+  wrap.innerHTML =
+    '<div>'+
+      '<p class="eyebrow">'+tt("greetLine")+'</p>'+
+      '<h1 class="page-title">'+tt("dashboardTitle")+'</h1>'+
+    '</div>'+
+    '<a class="cta-scan" href="#/scan">'+
+      '<span class="ic">'+icon("camera")+'</span>'+
+      '<span>'+
+        '<span class="big" style="display:block">'+tt("scanSell")+'</span>'+
+        '<span class="sub">'+(capture ? tt("scanSellResume",{phase:phaseLabel}) : tt("scanSellSub"))+'</span>'+
+      '</span>'+
+      '<span style="margin-left:auto">'+icon("arrowR")+'</span>'+
+    '</a>'+
+    '<nav class="quicknav" aria-label="Quick actions">'+
+      '<a class="qn-card" href="#/value">'+icon("rupee")+'<p class="lbl">'+tt("checkPrice")+'</p><p class="sub">'+pcb.id+' ₹'+pcb.priceMin+'–₹'+pcb.priceMax+tt("perKg")+'</p></a>'+
+      '<a class="qn-card" href="#/map">'+icon("pin")+'<p class="lbl">'+tt("findRecycler")+'</p><p class="sub">'+authorizedNearby+' '+tt("col_authorized_nearby")+'</p></a>'+ 
+      '<a class="qn-card" href="#/lots">'+icon("package")+'<p class="lbl">'+tt("myLots")+'</p><p class="sub">'+lots.length+' '+tt("col_lots_count")+'</p></a>'+ 
+      '<a class="qn-card" href="#/earnings">'+icon("wallet")+'<p class="lbl">'+tt("myEarnings")+'</p><p class="sub">'+inr(totals.monthCompleted)+' · '+tt("thisMonth")+'</p></a>'+
+    '</nav>'+
+    '<div class="grid2">'+
+      '<section class="panel panel-pad">'+
+        '<div style="display:flex; align-items:center; justify-content:space-between">'+
+          '<h2 style="margin:0; font-family:var(--font-display)">'+tt("recentLots")+'</h2>'+
+          (lots.length ? '<a href="#/lots" class="badge" style="background:var(--panel-2)">'+tt("viewAll")+' →</a>' : '')+
+        '</div>'+
+        (lots.length === 0
+          ? '<div class="empty" style="margin-top:.8rem"><p class="t">'+tt("noLotsTitle")+'</p><p class="b">'+tt("noLotsBody")+'</p><a class="btn btn-accent" style="margin-top:.8rem" href="#/scan">'+tt("startWithPhoto")+'</a></div>'
+          : '<ul style="list-style:none; margin:.8rem 0 0; padding:0">'+lots.slice(0,3).map(function(l){
+              return '<li class="list-item"><a href="#/lots/'+encodeURIComponent(l.id)+'" style="display:flex; justify-content:space-between; width:100%; align-items:center">'+
+                '<span><strong>'+l.material+'</strong> · '+l.weightKg+'kg<br><span class="faint" style="font-size:.78rem">'+l.id+' · '+tt(statusKey(l.status))+'</span></span>'+
+                '<span class="badge sync-'+l.syncState+'">'+l.syncState+'</span></a></li>';
+            }).join("")+'</ul>')+
+      '</section>'+
+      '<div class="stack">'+
+        '<section class="money-card">'+
+          '<div style="display:flex; align-items:flex-start; justify-content:space-between; gap:.5rem">'+
+            '<div><p class="lbl">'+tt("todayEarn")+'</p><p class="amt num" id="todayAmt">₹0</p></div>'+
+            (totals.today>0 ? speakBtn(tt("todayEarn")+" "+inr(totals.today), tt("col_speak")) : "")+
+          '</div>'+
+          '<p class="note">'+(totals.todayCount ? totals.todayCount+' '+tt("col_sales_today") : tt("col_no_sales_today"))+'</p>'+ 
+          '<a class="cta" href="#/earnings">'+tt("openLedger")+' →</a>'+
+        '</section>'+
+        '<section class="panel panel-pad">'+
+          '<h2 style="margin:0 0 .6rem; font-family:var(--font-display)">'+tt("journey")+'</h2>'+
+          renderStepper(phase)+
+          '<p class="muted" style="font-size:.86rem; margin:.7rem 0 0">'+(capture ? tt("col_lot")+" "+capture.lotId+" · "+phaseLabel : tt("col_no_lot"))+'</p>'+ 
+          '<a class="btn btn-outline btn-block" style="margin-top:.7rem" href="#/scan">'+(capture ? tt("continueCapture") : tt("startWithPhoto"))+'</a>'+
+        '</section>'+
+      '</div>'+
+    '</div>';
+
+  requestAnimationFrame(function(){ var el=wrap.querySelector("#todayAmt"); if(el) countUp(el, totals.today); });
+  wrap.addEventListener("click", speakDelegate);
+  return wrap;
+}
+
+function renderStepper(activeIdx){
+  var segs = PHASES.map(function(_,i){
+    return '<span class="seg '+(i<activeIdx?"done":i===activeIdx?"active":"")+'"><i></i></span>';
+  }).join("");
+  var labels = PHASES.map(function(k,i){ return '<span class="'+(i===activeIdx?"active":"")+'">'+tt(k)+'</span>'; }).join("");
+  return '<div class="stepper">'+segs+'</div><div class="stepper-labels">'+labels+'</div>';
+}
+
+function speakDelegate(e){
+  var btn = e.target.closest && e.target.closest("[data-speak]");
+  if(btn) speak(decodeURIComponent(btn.getAttribute("data-speak")));
+}
+
+function ViewLots(){
+  var lots = loadLots();
+  function lotAmount(l){
+    if(typeof l.finalPrice === "number") return l.finalPrice;
+    if(typeof l.quote === "number") return Math.round(l.quote * l.weightKg);
+    return null;
+  }
+  var wrap = h('<div></div>');
+  wrap.innerHTML =
+    subhead(tt("backToLots"), "#/")+
+    '<h1 class="page-title">'+tt("myLotsTitle")+'</h1>'+
+    (lots.length === 0
+      ? '<div class="empty" style="margin-top:.8rem"><p class="t">'+tt("lotsEmpty")+'</p></div>'
+      : '<ul style="list-style:none; margin:.8rem 0; padding:0">'+lots.map(function(l){
+          var amt = lotAmount(l);
+          return '<li class="list-item"><a href="#/lots/'+encodeURIComponent(l.id)+'" style="display:flex; justify-content:space-between; width:100%; align-items:center">'+
+            '<span><strong>'+l.material+'</strong> · '+l.weightKg+'kg<br><span class="faint" style="font-size:.78rem">'+l.id+' · '+tt(statusKey(l.status))+'</span><br>'+
+            (amt===null ? '<span class="faint" style="font-size:.78rem; font-weight:700">'+tt("awaitingQuote")+'</span>' : '<span class="num" style="font-weight:700">'+inr(amt)+'</span>')+
+            '</span><span class="badge sync-'+l.syncState+'">'+l.syncState+'</span></a></li>';
+        }).join("")+'</ul>')+
+    '<a class="btn btn-accent btn-block btn-lg" href="#/scan">+ '+tt("newLot")+'</a>';
+  return wrap;
+}
+
+function ViewLotDetail(id){
+  var lots = loadLots();
+  var lot = lots.find(function(l){ return l.id === id; });
+  var wrap = h('<div></div>');
+  if(!lot){
+    wrap.innerHTML =
+      subhead(tt("backToLots"), "#/lots")+
+      '<h1 class="page-title">'+tt("lotNotFound")+'</h1>'+
+      '<div class="empty"><p class="b">'+tt("lotNotFoundBody")+'</p></div>'+
+      '<div class="grid2" style="margin-top:.8rem">'+
+        '<a class="btn btn-outline btn-block" href="#/lots">'+tt("backToLots")+'</a>'+
+        '<a class="btn btn-accent btn-block" href="#/scan">'+tt("scanNewLot")+'</a>'+
+      '</div>';
+    return wrap;
+  }
+  var rec = RECYCLERS.find(function(r){ return r.id === lot.recyclerId; });
+  var FLOW = [["Collected","traceCollected"],["Listed","traceListed"],["Buyer matched","traceMatched"],["Pickup scheduled","traceScheduled"],["Handover complete","traceHandover"]];
+  var statusIdx = FLOW.findIndex(function(f){ return f[0]===lot.status; });
+  if(statusIdx < 0) statusIdx = 0;
+
+  wrap.innerHTML =
+    subhead(tt("backToLots"), "#/lots")+
+    '<h1 class="page-title">'+lot.material+' · '+lot.weightKg+'kg</h1>'+
+    '<p class="muted" style="display:flex; gap:.6rem; align-items:center; flex-wrap:wrap">'+
+      '<span>'+lot.id+' · '+formatDate(lot.createdAt, lang)+'</span><span class="badge sync-'+lot.syncState+'">'+lot.syncState+'</span></p>'+
+    '<ol class="trace panel panel-pad">'+FLOW.map(function(f,i){
+      var done = i <= statusIdx;
+      return '<li><span style="display:flex; flex-direction:column; align-items:center">'+
+        '<span class="trace-dot '+(done?"done":"pending")+'">'+(done?icon("check"):(i+1))+'</span>'+
+        (i<FLOW.length-1 ? '<span class="trace-line '+(i<statusIdx?"done":"")+'"></span>' : '')+
+        '</span><p>'+tt(f[1])+'</p></li>';
+    }).join("")+'</ol>'+
+    '<div class="grid2" style="grid-template-columns:repeat(2,1fr)">'+
+      infoCard(tt("materialLabel"), lot.material)+
+      infoCard(tt("finalLabel")==="Weight"?"":"Weight", lot.weightKg+" kg")+
+      infoCard(tt("quoteLabel"), lot.quote ? "₹"+lot.quote+tt("perKg") : "—")+
+      infoCard(tt("finalLabel"), lot.finalPrice ? inr(lot.finalPrice) : "—")+
+    '</div>'+
+    (rec ? '<p class="panel panel-pad" style="display:flex; align-items:center; gap:.5rem; color:var(--verdigris); font-weight:700">'+icon("shield")+rec.name+' · '+tt("authorizedBadge")+' · '+rec.area+'</p>' : '')+
+    (lot.handoverId
+      ? '<div class="panel panel-pad" style="text-align:center">'+
+          '<p style="font-weight:700">'+tt("qrPassport")+' · '+lot.handoverId+'</p>'+
+          '<div class="qr-fake">'+fakeQr(lot.id)+'</div>'+
+        '</div>'
+      : '')+
+    (lot.syncState === "failed"
+      ? '<p class="pill warn" style="width:100%; box-sizing:border-box">'+tt("failedSyncNote")+'</p>'
+      : '');
+  return wrap;
+}
+
+function fakeQr(seed){
+  // Deterministic pseudo-QR pattern from the lot id — purely decorative.
+  var s = 0; for(var i=0;i<seed.length;i++) s = (s*31 + seed.charCodeAt(i)) % 997;
+  var cells = "";
+  for(var r=0;r<7;r++) for(var c=0;c<7;c++){
+    s = (s*1103515245 + 12345) % 2147483648;
+    var on = (s % 100) < 46 || (r<2&&c<2) || (r<2&&c>4) || (r>4&&c<2);
+    cells += '<i class="'+(on?"":"off")+'"></i>';
+  }
+  return cells;
+}
+
+function infoCard(k,v){ return '<div class="panel panel-pad"><p class="faint" style="font-size:.7rem; font-weight:700; text-transform:uppercase; margin:0 0 .2rem">'+k+'</p><p style="font-weight:800; margin:0">'+v+'</p></div>'; }
+function subhead(backLabel, backHref){
+  return '<div class="subhead"><a class="backlink" href="'+backHref+'">'+icon("arrowL")+backLabel+'</a></div>';
+}
+
+function ViewMap(){
+  var wrap = h('<div></div>');
+  var filter = "all";
+  var map = null;
+  var markerLayer = null;
+  var initTimer = 0;
+
+  function recList(){ return RECYCLERS.filter(function(r){ return filter==="all" || r.materials.indexOf(filter)>=0; }); }
+  function renderRecyclerList(){
+    var recs = recList();
+    wrap.querySelector("#portalRecyclerList").innerHTML = recs.map(function(r){
+      return '<li class="list-item" style="display:flex; align-items:center; justify-content:space-between">'+
+        '<span><strong>'+r.name+'</strong> · '+r.distanceKm+' km<br><span class="faint" style="font-size:.78rem">'+r.materials.join(" · ")+'</span></span>'+
+        '<span class="badge '+(r.authorized?"auth":"notauth")+'">'+(r.authorized?icon("shield")+tt("authorizedBadge"):tt("notAuthorized"))+'</span>'+
+        '</li>';
+    }).join("");
+  }
+  function recyclerPinIcon(authorized){
+    var token = authorized ? "--verdigris" : "--ink-faint";
+    var glyph = authorized
+      ? '<path d="M10.7 13.9l2.3 2.3 4.4-4.8" />'
+      : '<circle cx="14" cy="13.5" r="4.9" /><path d="M10.5 10l7 7" />';
+    return L.divIcon({
+      className:"portal-leaflet-pin",
+      html:'<svg width="28" height="36" viewBox="0 0 28 36" aria-hidden="true">'+
+        '<path d="M14 1.5C7.3 1.5 2 6.8 2 13.4c0 8.2 9 19.1 11.3 21.7a1 1 0 0 0 1.4 0C17 32.5 26 21.6 26 13.4 26 6.8 20.7 1.5 14 1.5Z" style="fill:var('+token+')" stroke="#fff" stroke-width="1.7" stroke-linejoin="round" />'+
+        '<circle cx="14" cy="13.4" r="6.3" fill="#fff" />'+
+        '<g fill="none" style="stroke:var('+token+')" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">'+glyph+'</g></svg>',
+      iconSize:[28,36],
+      iconAnchor:[14,36],
+      popupAnchor:[0,-32]
+    });
+  }
+  function renderMarkers(){
+    if(!markerLayer) return;
+    markerLayer.clearLayers();
+    recList().forEach(function(r){
+      var popup = document.createElement("div");
+      var name = document.createElement("strong");
+      name.textContent = r.name;
+      var status = document.createElement("p");
+      status.textContent = (r.authorized ? tt("authorizedBadge") : tt("notAuthorized"))+" · "+r.distanceKm+" km";
+      var materials = document.createElement("p");
+      materials.textContent = r.materials.join(" · ");
+      popup.appendChild(name);
+      popup.appendChild(status);
+      popup.appendChild(materials);
+      L.marker([r.lat,r.lng],{icon:recyclerPinIcon(r.authorized),title:r.name,alt:r.name})
+        .bindPopup(popup)
+        .addTo(markerLayer);
+    });
+  }
+  function initializeMap(){
+    var mapElement = wrap.querySelector("#portalLeafletMap");
+    if(!mapElement) return;
+    if(!mapElement.isConnected){ initTimer=window.setTimeout(initializeMap,0); return; }
+    if(!window.L){
+      mapElement.innerHTML='<p class="portal-map-loading">'+tt("mapUnavailable")+'</p>';
+      return;
+    }
+    var loadingMessage = mapElement.querySelector(".portal-map-loading");
+    if(loadingMessage) loadingMessage.remove();
+    map = L.map(mapElement,{scrollWheelZoom:false}).setView([19.0760,72.8777],11);
+    L.tileLayer("https://tile.openstreetmap.de/{z}/{x}/{y}.png",{
+      maxZoom:19,
+      attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+    markerLayer = L.layerGroup().addTo(map);
+    renderMarkers();
+    window.requestAnimationFrame(function(){ if(map) map.invalidateSize(); });
+  }
+  wrap.innerHTML =
+    subhead(tt("home"), "#/")+ 
+    '<h1 class="page-title">'+tt("mapTitle")+'</h1>'+
+    '<div class="chips" role="group" style="margin:.6rem 0 .9rem">'+
+      ["all","PCB","cable","battery"].map(function(f){
+        return '<button class="chip" data-f="'+f+'" aria-pressed="'+(filter===f)+'">'+(f==="all"?tt("filterAll"):f)+'</button>';
+      }).join("")+ 
+    '</div>'+
+    '<div class="map-frame">'+
+      '<div class="portal-leaflet-map" id="portalLeafletMap" role="application" aria-label="'+tt("mapTitle")+'"><p class="portal-map-loading">'+tt("mapLoading")+'</p></div>'+
+    '</div>'+
+    '<ul id="portalRecyclerList" style="list-style:none; margin:.9rem 0 0; padding:0"></ul>'+
+    '<p class="faint" style="font-size:.8rem; margin-top:.7rem">'+tt("mapLotsNote",{count: loadLots().length})+'</p>';
+
+  renderRecyclerList();
+  wrap.querySelectorAll("[data-f]").forEach(function(button){
+    button.addEventListener("click",function(){
+      filter=button.getAttribute("data-f");
+      wrap.querySelectorAll("[data-f]").forEach(function(chip){chip.setAttribute("aria-pressed",chip===button?"true":"false");});
+      renderRecyclerList();
+      renderMarkers();
+    });
+  });
+  mapAnimationCleanup=function(){
+    if(initTimer) window.clearTimeout(initTimer);
+    if(map){ map.remove(); map=null; markerLayer=null; }
+    initTimer=0;
+  };
+  initTimer=window.setTimeout(initializeMap,0);
+  return wrap;
+}
+
+function ViewEarnings(){
+  var tx = loadTxns();
+  var totals = summarizeLedger(tx, new Date());
+  var month = monthKeyOf(localDayKey());
+  var byMat = {};
+  tx.filter(function(t){ return t.state==="completed" && monthKeyOf(t.date)===month; }).forEach(function(t){ byMat[t.material] = (byMat[t.material]||0) + t.amount; });
+  var byMatArr = Object.keys(byMat).map(function(k){ return [k, byMat[k]]; }).sort(function(a,b){ return b[1]-a[1]; });
+  var max = byMatArr.length ? byMatArr[0][1] : 1;
+  var receipts = tx.slice().sort(function(a,b){ return a.date < b.date ? 1 : -1; });
+
+  var wrap = h('<div></div>');
+  wrap.innerHTML =
+    subhead(tt("home"), "#/")+
+    '<h1 class="page-title">'+tt("earningsTitle")+'</h1>'+
+    '<p class="eyebrow">'+totals.monthLabel+'</p>'+
+    '<p class="money-card" style="text-align:center"><span class="amt num" style="display:block; font-size:2.4rem">'+inr(totals.monthCompleted)+'</span></p>'+
+    '<div class="grid2" style="grid-template-columns:repeat(2,1fr); margin-top:.8rem">'+
+      infoCard(tt("salesThisMonth"), totals.monthCount)+
+      infoCard(tt("stillToBePaid"), inr(totals.pending))+
+    '</div>'+
+    '<section class="panel panel-pad" style="margin-top:1rem">'+
+      '<h2 style="margin:0; font-family:var(--font-display)">'+tt("perMaterial")+'</h2>'+
+      (byMatArr.length===0
+        ? '<p class="muted" style="font-size:.9rem">'+tt("noSalesMonth")+'</p>'
+        : '<ul style="list-style:none; margin:.7rem 0 0; padding:0">'+byMatArr.map(function(pair){
+            return '<li style="margin-bottom:.6rem"><div style="display:flex; justify-content:space-between; font-weight:700; font-size:.9rem"><span>'+pair[0]+'</span><span class="num">'+inr(pair[1])+'</span></div>'+
+              '<div style="height:8px; border-radius:4px; background:var(--border); margin-top:.3rem; overflow:hidden"><div style="height:100%; border-radius:4px; background:var(--copper); width:'+Math.round(pair[1]/max*100)+'%"></div></div></li>';
+          }).join("")+'</ul>')+
+    '</section>'+
+    '<section class="panel panel-pad" style="margin-top:1rem">'+
+      '<h2 style="margin:0; font-family:var(--font-display)">'+tt("receipts")+'</h2>'+
+      (receipts.length===0
+        ? '<div class="empty" style="margin-top:.7rem"><p class="b">'+tt("receiptsEmpty")+'</p></div>'
+        : '<ul style="list-style:none; margin:.7rem 0 0; padding:0">'+receipts.map(function(t){
+            return '<li class="list-item" style="display:flex; justify-content:space-between">'+
+              '<span><strong>'+t.material+'</strong> · '+t.weightKg+'kg · '+(t.method==="Cash"?tt("cash"):tt("upi"))+'<br><span class="faint" style="font-size:.76rem">'+formatDay(t.date,lang)+' · '+t.lotId+'</span></span>'+
+              '<span style="text-align:right"><strong class="num">'+inr(t.amount)+'</strong><br><span class="faint" style="font-size:.76rem; font-weight:700; color:'+(t.state==="completed"?"var(--verdigris)":"var(--ink-dim)")+'">'+(t.state==="completed"?tt("stateCompleted"):tt("statePending"))+'</span></span></li>';
+          }).join("")+'</ul>')+
+    '</section>';
+  return wrap;
+}
+
+function ViewValue(){
+  var STALE_AFTER_DAYS = 3;
+  var wrap = h('<div></div>');
+  var rows = MATERIALS.map(function(m){
+    var age = daysSinceStated(m.updatedAt);
+    var stale = age !== null && age >= STALE_AFTER_DAYS;
+    var ageLabel = age === 0 ? "Updated today" : "Updated "+age+"d ago";
+    return { m:m, stale:stale, ageLabel:ageLabel };
+  });
+  wrap.innerHTML =
+    subhead(tt("home"), "#/")+
+    '<h1 class="page-title">'+tt("priceBoardTitle")+'</h1>'+
+    '<p class="muted">'+tt("priceBoardSub")+'</p>'+
+    '<p class="pill warn" style="margin:.5rem 0 1rem">'+tt("indicative")+'</p>'+
+    '<div class="stack">'+rows.map(function(row){
+      var m = row.m;
+      return '<div class="price-row">'+
+        '<span class="mat-icon">'+icon(m.icon)+'</span>'+
+        '<div style="flex:1; min-width:0">'+
+          '<p style="font-weight:800; margin:0">'+m.id+'</p>'+
+          '<p class="faint" style="font-size:.74rem; margin:.15rem 0 0; color:'+(row.stale?"var(--copper-ink)":"var(--ink-faint)")+'">'+row.ageLabel+'</p>'+
+        '</div>'+
+        '<span class="amt num">₹'+m.priceMin+'–₹'+m.priceMax+'<span class="faint" style="font-size:.7rem">'+tt("perKg")+'</span></span>'+
+        speakBtn(m.id+" "+m.priceMin+" to "+m.priceMax+" rupees per kilo", tt("listenPrice"))+
+      '</div>';
+    }).join("")+'</div>'+
+    '<a class="btn btn-accent btn-block btn-lg" style="margin-top:1.2rem" href="#/scan">'+tt("scanSell")+' →</a>';
+  wrap.addEventListener("click", speakDelegate);
+  return wrap;
+}
+
+/* ---------- Scan & Sell flow (Photo → Weight → Price → Recycler → Schedule → Handover) ---------- */
+function ViewScan(){
+  var capture = loadCapture() || { phase:0, material:null, weightKg:null, quote:null, recyclerId:null, lotId:"LOT-"+(2000+Math.floor(Math.random()*900)), photoData:null };
+  capture.photoData = capture.photoData || null;
+  saveCapture(capture);
+  var wrap = h('<div></div>');
+  var cameraStream = null;
+
+  function readImageFile(file){
+    if(!file || !file.type || !file.type.match(/^image\//)) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      capture.photoData = reader.result;
+      capture.photoSource = 'upload';
+      persist();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function captureFromCamera(){
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      window.alert('Camera access is not supported in this browser. Please upload a photo instead.');
+      return;
+    }
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(function(stream){
+      cameraStream = stream;
+      var stage = wrap.querySelector('#cameraStage');
+      var video = wrap.querySelector('#scanCameraPreview');
+      if(stage && video){
+        video.srcObject = stream;
+        video.play();
+        stage.classList.add('active');
+      }
+    }).catch(function(){
+      window.alert('Camera permission was denied. You can still upload a photo from your device.');
+    });
+  }
+
+  function takeCameraSnapshot(){
+    var video = wrap.querySelector('#scanCameraPreview');
+    if(!video || !cameraStream){ return; }
+    var canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    capture.photoData = canvas.toDataURL('image/jpeg', 0.9);
+    capture.photoSource = 'camera';
+    if(cameraStream){ cameraStream.getTracks().forEach(function(track){ track.stop(); }); cameraStream = null; }
+    persist();
+  }
+
+  function persist(){ saveCapture(capture); paint(); }
+  function paint(){
+    wrap.innerHTML =
+      subhead(tt("home"), "#/")+
+      '<h1 class="page-title">'+tt("scanSell")+'</h1>'+
+      renderStepper(capture.phase)+
+      '<div class="panel panel-pad" style="margin-top:1rem">'+stepBody()+'</div>';
+    wireStep();
+  }
+
+  function stepBody(){
+    if(capture.phase === 0){
+      var photoPreview = capture.photoData ? '<div class="scan-preview"><img src="'+capture.photoData+'" alt="Captured scrap photo" /></div>' : '';
+      return '<p class="eyebrow" style="margin-bottom:.6rem">Scan & Check</p>'+
+        '<div class="scan-methods">'+
+          '<button type="button" class="scan-method" data-scan-method="camera">'+icon("camera")+'<span>Use camera</span></button>'+
+          '<button type="button" class="scan-method" data-scan-method="upload">'+icon("package")+'<span>Upload photo</span></button>'+
+        '</div>'+
+        '<input id="scanUploadInput" type="file" accept="image/*" capture="environment" style="display:none" />'+
+        '<div class="camera-stage" id="cameraStage">'+
+          '<video id="scanCameraPreview" autoplay playsinline muted></video>'+
+          '<div class="camera-actions">'+
+            '<button type="button" class="btn btn-outline" data-camera-close>Cancel</button>'+
+            '<button type="button" class="btn btn-accent" data-camera-capture>Capture</button>'+
+          '</div>'+
+        '</div>'+photoPreview+
+        '<p class="eyebrow" style="margin:1rem 0 .6rem">'+tt("pickMaterial")+'</p>'+
+        '<div class="mat-pick">'+MATERIALS.map(function(m){
+          return '<button data-mat="'+m.id+'" aria-pressed="'+(capture.material===m.id)+'">'+icon(m.icon)+'<span style="font-size:.82rem; font-weight:700; text-align:center">'+m.id+'</span></button>';
+        }).join("")+'</div>'+
+        '<button class="btn btn-accent btn-block btn-lg" style="margin-top:1rem" data-next data-disabled="'+(!capture.material)+'">'+tt("next")+'</button>';
+    }
+    if(capture.phase === 1){
+      return '<p class="eyebrow" style="margin-bottom:.4rem">'+capture.material+'</p>'+
+        '<div class="field"><label>'+tt("weightLabel")+'</label><input type="number" min="0.1" step="0.1" id="wInput" value="'+(capture.weightKg||"")+'" placeholder="e.g. 2.5" /></div>'+
+        '<div class="grid2" style="grid-template-columns:1fr 1fr">'+
+          '<button class="btn btn-outline btn-block" data-back>'+tt("back")+'</button>'+
+          '<button class="btn btn-accent btn-block" data-next>'+tt("submitForQuote")+'</button>'+
+        '</div>';
+    }
+    if(capture.phase === 2){
+      var m = materialById(capture.material);
+      var rate = m.priceMin + Math.round((m.priceMax-m.priceMin) * 0.6);
+      capture.quote = capture.quote || rate;
+      var total = Math.round(capture.quote * (capture.weightKg||1));
+      return '<p class="eyebrow">'+tt("quoteLabel")+'</p>'+
+        '<p class="amt num" style="font-family:var(--font-display); font-size:2rem; font-weight:700; margin:.2rem 0">₹'+capture.quote+tt("perKg")+'</p>'+
+        '<p class="muted">'+capture.weightKg+' kg × ₹'+capture.quote+' ≈ <strong>'+inr(total)+'</strong></p>'+
+        '<div class="grid2" style="grid-template-columns:1fr 1fr; margin-top:.8rem">'+
+          '<button class="btn btn-outline btn-block" data-back>'+tt("back")+'</button>'+
+          '<button class="btn btn-accent btn-block" data-next>'+tt("acceptQuote")+'</button>'+
+        '</div>';
+    }
+    if(capture.phase === 3){
+      var eligible = RECYCLERS.filter(function(r){ return r.materials.indexOf(capture.material)>=0 || r.materials.indexOf({"PCB":"PCB","Copper Cable":"cable","Li-ion Battery":"battery"}[capture.material])>=0; });
+      if(!eligible.length) eligible = RECYCLERS;
+      return '<p class="eyebrow" style="margin-bottom:.6rem">'+tt("pickRecycler")+'</p>'+
+        '<div class="rec-pick">'+eligible.map(function(r){
+          return '<button data-rec="'+r.id+'" aria-pressed="'+(capture.recyclerId===r.id)+'"><span><strong>'+r.name+'</strong><br><span class="faint" style="font-size:.78rem">'+r.area+' · '+r.distanceKm+'km</span></span>'+(r.authorized?'<span class="badge auth">'+icon("shield")+tt("authorizedBadge")+'</span>':'')+'</button>';
+        }).join("")+'</div>'+
+        '<div class="grid2" style="grid-template-columns:1fr 1fr; margin-top:1rem">'+
+          '<button class="btn btn-outline btn-block" data-back>'+tt("back")+'</button>'+
+          '<button class="btn btn-accent btn-block" data-next data-disabled="'+(!capture.recyclerId)+'">'+tt("next")+'</button>'+
+        '</div>';
+    }
+    if(capture.phase === 4){
+      return '<p class="eyebrow" style="margin-bottom:.6rem">'+tt("schedule")+'</p>'+
+        '<div class="field"><label>'+tt("schedule")+'</label><input type="date" id="dInput" min="'+localDayKey()+'" value="'+(capture.pickupDate||localDayKey())+'" /></div>'+
+        '<div class="grid2" style="grid-template-columns:1fr 1fr">'+
+          '<button class="btn btn-outline btn-block" data-back>'+tt("back")+'</button>'+
+          '<button class="btn btn-accent btn-block" data-next>'+tt("confirmSchedule")+'</button>'+
+        '</div>';
+    }
+    // phase 5 — handover
+    var handoverId = capture.handoverId || ("HX-"+Math.floor(1000+Math.random()*9000));
+    capture.handoverId = handoverId;
+    return '<div style="text-align:center">'+
+      '<p class="eyebrow">'+tt("qrPassport")+'</p>'+
+      '<div class="qr-fake">'+fakeQr(capture.lotId)+'</div>'+
+      '<p class="muted" style="margin-top:.6rem">'+capture.lotId+' · '+handoverId+'</p>'+
+      '</div>'+
+      '<div class="field" style="margin-top:1rem"><label>'+tt("pickPayment")+'</label>'+
+        '<div class="grid2" style="grid-template-columns:1fr 1fr">'+
+          '<button class="btn btn-outline" data-pay="Cash" aria-pressed="'+(capture.method==="Cash")+'">'+tt("cash")+'</button>'+
+          '<button class="btn btn-outline" data-pay="UPI" aria-pressed="'+(capture.method==="UPI")+'">'+tt("upi")+'</button>'+
+        '</div></div>'+
+      '<button class="btn btn-accent btn-block btn-lg" style="margin-top:1rem" data-finish data-disabled="'+(!capture.method)+'">'+tt("markPaid")+'</button>';
+  }
+
+  function wireStep(){
+    var cameraBtn = wrap.querySelector('[data-scan-method="camera"]');
+    if(cameraBtn){ cameraBtn.addEventListener("click", captureFromCamera); }
+
+    var uploadBtn = wrap.querySelector('[data-scan-method="upload"]');
+    var uploadInput = wrap.querySelector('#scanUploadInput');
+    if(uploadBtn && uploadInput){
+      uploadBtn.addEventListener("click", function(){ uploadInput.click(); });
+      uploadInput.addEventListener("change", function(event){
+        var file = event.target.files && event.target.files[0];
+        readImageFile(file);
+        uploadInput.value = "";
+      });
+    }
+
+    var closeCamera = wrap.querySelector('[data-camera-close]');
+    if(closeCamera){
+      closeCamera.addEventListener("click", function(){
+        if(cameraStream){ cameraStream.getTracks().forEach(function(track){ track.stop(); }); cameraStream = null; }
+        var stage = wrap.querySelector('#cameraStage');
+        if(stage) stage.classList.remove('active');
+      });
+    }
+
+    var captureCamera = wrap.querySelector('[data-camera-capture]');
+    if(captureCamera){ captureCamera.addEventListener("click", takeCameraSnapshot); }
+
+    wrap.querySelectorAll("[data-mat]").forEach(function(b){ b.addEventListener("click", function(){ capture.material=b.getAttribute("data-mat"); persist(); }); });
+    wrap.querySelectorAll("[data-rec]").forEach(function(b){ b.addEventListener("click", function(){ capture.recyclerId=b.getAttribute("data-rec"); persist(); }); });
+    wrap.querySelectorAll("[data-pay]").forEach(function(b){ b.addEventListener("click", function(){ capture.method=b.getAttribute("data-pay"); persist(); }); });
+    var back = wrap.querySelector("[data-back]");
+    if(back) back.addEventListener("click", function(){ capture.phase = Math.max(0, capture.phase-1); persist(); });
+    var next = wrap.querySelector("[data-next]");
+    if(next){
+      if(next.getAttribute("data-disabled")==="true") next.disabled = true;
+      next.addEventListener("click", function(){
+        if(capture.phase===1){ var w = parseFloat((wrap.querySelector("#wInput")||{}).value); if(!w || w<=0) return; capture.weightKg = w; }
+        if(capture.phase===4){ capture.pickupDate = (wrap.querySelector("#dInput")||{}).value || localDayKey(); syncLotOnSchedule(); }
+        capture.phase = Math.min(PHASES.length-1, capture.phase+1);
+        persist();
+      });
+    }
+    var finish = wrap.querySelector("[data-finish]");
+    if(finish){
+      if(finish.getAttribute("data-disabled")==="true") finish.disabled = true;
+      finish.addEventListener("click", finishLot);
+    }
+  }
+
+  function syncLotOnSchedule(){
+    var lots = loadLots();
+    var existing = lots.find(function(l){ return l.id===capture.lotId; });
+    var lotObj = existing || { id:capture.lotId, createdAt:localDayKey() };
+    lotObj.material = capture.material;
+    lotObj.weightKg = capture.weightKg;
+    lotObj.quote = capture.quote;
+    lotObj.recyclerId = capture.recyclerId;
+    lotObj.status = "Pickup scheduled";
+    lotObj.syncState = navigator.onLine ? "synced" : "pending";
+    if(!existing) lots.unshift(lotObj); else lots = lots.map(function(l){ return l.id===lotObj.id ? lotObj : l; });
+    saveLots(lots);
+  }
+
+  function finishLot(){
+    var lots = loadLots();
+    var finalPrice = Math.round(capture.quote * capture.weightKg);
+    var lotObj = lots.find(function(l){ return l.id===capture.lotId; }) || { id:capture.lotId, createdAt:localDayKey(), material:capture.material, weightKg:capture.weightKg, quote:capture.quote, recyclerId:capture.recyclerId };
+    lotObj.status = "Handover complete";
+    lotObj.finalPrice = finalPrice;
+    lotObj.handoverId = capture.handoverId;
+    lotObj.syncState = navigator.onLine ? "synced" : "pending";
+    var rest = lots.filter(function(l){ return l.id!==lotObj.id; });
+    saveLots([lotObj].concat(rest));
+
+    var txns = loadTxns();
+    txns.unshift({ id:"TX-"+Date.now(), lotId:lotObj.id, material:capture.material, weightKg:capture.weightKg, amount:finalPrice, method:capture.method, state: navigator.onLine ? "completed" : "pending", date: localDayKey() });
+    saveTxns(txns);
+
+    saveCapture(null);
+    location.hash = "#/lots/"+encodeURIComponent(lotObj.id);
+  }
+
+  paint();
+  return wrap;
+}
+
+/* =========================================================================
+   Global chrome wiring
+   ========================================================================= */
+function applyLang(l){
+  if(!DICT[l]) return;
+  lang = l;
+  try{ localStorage.setItem("kc-lang", l); }catch(e){}
+  document.documentElement.setAttribute("lang", l);
+  document.querySelectorAll(".lang-btn").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-lang")===l); });
+  go();
+}
+window.KC = window.KC || {};
+window.KC.setLanguage = applyLang;
+window.KC.currentLang = function(){ return lang; };
+document.querySelectorAll(".lang-btn").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-lang")===lang); });
+
+var themeToggle = document.getElementById("themeToggle");
+if (themeToggle) {
+  themeToggle.addEventListener("click", function(){
+    var cur = document.documentElement.getAttribute("data-theme");
+    var next = cur === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try{ localStorage.setItem("kc-theme", next); }catch(e){}
+  });
+}
+
+function logoutToLogin() {
+  window.location.href = "login.html";
+}
+
+window.addEventListener("hashchange", go);
+window.addEventListener(KC_SYNC_EVENT, function(){ if(location.hash.indexOf("#/scan")!==0) go(); });
+window.addEventListener("online", renderConnBanner);
+window.addEventListener("offline", renderConnBanner);
+
+go();
+})();
+</script>
+</body>
+</html>

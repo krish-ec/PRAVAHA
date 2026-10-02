@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <script>
+    /* Apply saved theme before paint to avoid a flash (shared with landing). */
+    (function () {
+      try {
+        var t = localStorage.getItem("kc-theme");
+        if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1" />
+  <title>Collector App — PRAVAHA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/design-system.css" />
+  <link rel="stylesheet" href="../css/styles.css" />
+  <link rel="stylesheet" href="../css/page-theme.css" />
+  <style>
+    /* demo-bar layout tweaks (colors come from page-theme.css) */
+    .demo-bar {
+      padding: 0.5rem 1rem;
+      font-size: 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .category-picker {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    .cat-option {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 1rem 0.5rem;
+      background: var(--color-surface);
+      border: 2px solid var(--color-border);
+      border-radius: var(--radius-md);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      min-height: 90px;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .cat-option.selected, .cat-option:hover {
+      border-color: var(--color-go);
+      background: var(--color-go-light);
+    }
+    .cat-option .icon { font-size: 1.75rem; }
+    .weight-pad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+      max-width: 260px;
+      margin: 1rem auto;
+    }
+    .weight-pad button {
+      height: 52px;
+      font-size: 1.25rem;
+      font-weight: 600;
+      background: var(--color-surface-elevated);
+      border: 1.5px solid var(--color-border);
+      border-radius: var(--radius-md);
+    }
+    .weight-pad button:active { background: var(--color-go-light); }
+    .weight-display {
+      font-size: 2.5rem;
+      font-weight: 700;
+      text-align: center;
+      color: var(--color-go);
+      margin: 0.5rem 0;
+    }
+    .recycler-card {
+      display: flex;
+      gap: 1rem;
+      padding: 1rem;
+      background: var(--color-surface-elevated);
+      border: 1.5px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      margin-bottom: 0.75rem;
+      align-items: center;
+    }
+    .recycler-card:hover { border-color: var(--color-go); }
+    .recycler-rank {
+      width: 32px;
+      height: 32px;
+      background: var(--color-go-light);
+      color: var(--color-go);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.875rem;
+      flex-shrink: 0;
+    }
+    .sort-chips {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      overflow-x: auto;
+      padding-bottom: 0.25rem;
+    }
+    .chip {
+      padding: 0.4rem 0.875rem;
+      border-radius: var(--radius-full);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      background: var(--color-surface);
+      border: 1.5px solid var(--color-border);
+      white-space: nowrap;
+      color: var(--color-text-muted);
+    }
+    .chip.active {
+      background: var(--color-go);
+      border-color: var(--color-go);
+      color: white;
+    }
+    .qr-box {
+      width: 180px;
+      height: 180px;
+      margin: 1.5rem auto;
+      background: white;
+      border: 2px solid var(--color-border);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 4rem;
+      box-shadow: var(--shadow-md);
+    }
+    .lot-card {
+      background: var(--color-surface-elevated);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+    }
+    .ledger-total {
+      font-size: 2.25rem;
+      font-weight: 700;
+      color: var(--color-go);
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+    .ledger-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+    .ledger-split .card {
+      padding: 1rem;
+      text-align: center;
+    }
+    .logout-btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: .45rem;
+      padding: .72rem 1rem; border-radius: 999px; border: 1px solid var(--color-border);
+      background: var(--color-surface); color: var(--color-text); font-weight: 700;
+      box-shadow: var(--shadow-md); cursor: pointer; transition: transform .2s ease, border-color .2s ease;
+    }
+    .logout-btn:hover { transform: translateY(-1px); border-color: var(--color-go); color: var(--color-go); }
+  </style>
+</head>
+<body class="kc-desktop">
+  <!-- Shared navigation (single source: js/nav.js) -->
+  <div id="kc-nav"></div>
+
+  <div class="kc-page">
+    <div class="kc-page-head">
+      <div>
+        <span class="kc-eyebrow" data-i18n="col_eyebrow">Collector workspace · Demo</span>
+        <h1 data-i18n="col_page_title">Scan, price and sell your scrap.</h1>
+        <p data-i18n="col_page_sub">A guided, offline-tolerant flow — in your language, on any device.</p>
+      </div>
+      <div style="display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; justify-content:flex-end;">
+        <span class="kc-offline" id="offlinePill"><span>📴</span><span data-i18n="col_offline">Offline — 2 lots waiting to sync</span></span>
+        <button class="logout-btn" type="button" onclick="logoutToLogin()">Logout</button>
+      </div>
+    </div>
+
+    <div class="kc-workspace">
+      <!-- Left rail: quick navigation (also drives the flow via goTo) -->
+      <aside class="kc-rail" aria-label="Sections">
+        <button class="rail-item active" data-screen="home" onclick="goTo('home')"><span class="icon">🏠</span><span data-i18n="col_home">Home</span></button>
+        <button class="rail-item" data-screen="scan" onclick="goTo('scan')"><span class="icon">📷</span><span data-i18n="col_scan">Scan &amp; Sell</span></button>
+        <button class="rail-item" data-screen="price" onclick="goTo('price')"><span class="icon">💰</span><span data-i18n="col_check_price">Check price</span></button>
+        <button class="rail-item" data-screen="match" onclick="goTo('match')"><span class="icon">📍</span><span data-i18n="col_find_recycler">Find recycler</span></button>
+        <div class="kc-rail-sep"></div>
+        <button class="rail-item" data-screen="lots" onclick="goTo('lots')"><span class="icon">📦</span><span data-i18n="col_my_lots">My lots</span></button>
+        <button class="rail-item" data-screen="earnings" onclick="goTo('earnings')"><span class="icon">📊</span><span data-i18n="col_my_earnings">My earnings</span></button>
+      </aside>
+
+      <!-- Right: the active screen inside a professional panel -->
+      <div class="kc-stage">
+        <div class="kc-panel">
+  <div class="app-shell">
+    <!-- Offline banner (hidden on desktop; shown as a pill in the page head) -->
+    <div class="offline-banner" id="offlineBanner">
+      <span>📴</span>
+      <span data-i18n="col_offline">Offline — 2 lots waiting to sync</span>
+    </div>
+
+    <!-- ========== HOME ========== -->
+    <div class="screen active" id="screen-home">
+      <header class="app-header">
+        <a href="../index.html" class="logo">
+          <img class="brand-logo" data-light-src="../assets/pravaha-logo.png" data-dark-src="../assets/pravaha-logo.png" src="../assets/pravaha-logo.png" alt="PRAVAHA" />
+        </a>
+        <button class="voice-btn" title="Voice" onclick="speakPrice()">🔊</button>
+      </header>
+      <div class="app-content">
+        <button class="scan-btn" onclick="goTo('scan')">
+          <span class="icon">📷</span>
+          <span class="label" data-i18n="col_scan">Scan & Sell</span>
+          <span class="hint" data-i18n="col_scan_hint">Photo → Price → Recycler</span>
+        </button>
+
+        <div class="action-grid">
+          <button class="action-card" onclick="goTo('price')">
+            <span class="icon">💰</span>
+            <span class="label" data-i18n="col_check_price">Check price</span>
+          </button>
+          <button class="action-card" onclick="goTo('match')">
+            <span class="icon">📍</span>
+            <span class="label" data-i18n="col_find_recycler">Find recycler</span>
+          </button>
+          <button class="action-card" onclick="goTo('lots')">
+            <span class="icon">📦</span>
+            <span class="label" data-i18n="col_my_lots">My lots</span>
+          </button>
+          <button class="action-card" onclick="goTo('earnings')">
+            <span class="icon">📊</span>
+            <span class="label" data-i18n="col_my_earnings">My earnings</span>
+          </button>
+        </div>
+
+        <div class="earnings-snippet">
+          <div>
+            <div class="label" data-i18n="col_today">Today's earnings</div>
+            <div class="value">₹1,840</div>
+          </div>
+          <span class="badge badge-go">+ ₹420 pending</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== SCAN FLOW ========== -->
+    <div class="screen" id="screen-scan">
+      <header class="app-header">
+        <button class="btn-ghost" onclick="goTo('home')" style="font-size: 1.25rem;">←</button>
+        <span style="font-weight: 600;" data-i18n="col_scan">Scan &amp; Sell</span>
+        <button class="voice-btn" onclick="speak('Take a clear photo of the scrap')">🔊</button>
+      </header>
+      <div class="app-content" style="text-align: center;">
+        <div class="kc-camera" style="border-radius: 16px; height: 240px; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem; position: relative;">
+          <div style="font-size: 4rem;">📷</div>
+          <div style="position: absolute; bottom: 1rem; left: 0; right: 0; font-size: 0.8125rem; opacity: 0.8;" data-i18n="col_camera_preview">Camera preview (demo)</div>
+        </div>
+        <p class="body-sm text-muted mb-3">Point at PCB, cable, battery, motor, or plastic</p>
+        <button class="btn btn-primary btn-lg btn-block" onclick="capturePhoto()">
+          📸 Capture photo
+        </button>
+      </div>
+    </div>
+
+    <!-- ========== CATEGORY ========== -->
+    <div class="screen" id="screen-category">
+      <header class="app-header">
+        <button class="btn-ghost" onclick="goTo('scan')" style="font-size: 1.25rem;">←</button>
+        <span style="font-weight: 600;">Confirm category</span>
+        <button class="voice-btn" onclick="speak('AI suggests PCB with 82 percent confidence')">🔊</button>
+      </header>
+      <div class="app-content">
+        <div class="card card-body" style="text-align: center; margin-bottom: 1.25rem;">
+          <div style="font-size: 3rem; margin-bottom: 0.5rem;">🔌</div>
+          <div class="heading-2">PCB</div>
+          <div class="badge badge-go mt-2">AI confidence 82%</div>
+          <p class="body-sm text-muted mt-2">Printed Circuit Board · indicative match</p>
+        </div>
+        <div style="display: flex; gap: 0.75rem; margin-bottom: 1.5rem;">
+          <button class="btn btn-primary btn-block" onclick="selectCategory('PCB')">✓ Yes, correct</button>
+          <button class="btn btn-secondary btn-block" onclick="document.getElementById('manualPicker').classList.toggle('hidden')">Choose another</button>
+        </div>
+        <div id="manualPicker" class="hidden">
+          <p class="body-sm text-muted mb-2">Pick the closest match:</p>
+          <div class="category-picker">
+            <button class="cat-option" onclick="selectCategory('Cable')"><span class="icon">🔌</span>Cable</button>
+            <button class="cat-option" onclick="selectCategory('Battery')"><span class="icon">🔋</span>Battery</button>
+            <button class="cat-option" onclick="selectCategory('Motor')"><span class="icon">⚙️</span>Motor</button>
+            <button class="cat-option" onclick="selectCategory('LCD')"><span class="icon">🖥️</span>LCD</button>
+            <button class="cat-option" onclick="selectCategory('CRT')"><span class="icon">📺</span>CRT</button>
+            <button class="cat-option" onclick="selectCategory('Plastic')"><span class="icon">🧴</span>Plastic</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== WEIGHT ========== -->
+    <div class="screen" id="screen-weight">
+      <header class="app-header">
+        <button class="btn-ghost" onclick="goTo('category')" style="font-size: 1.25rem;">←</button>
+        <span style="font-weight: 600;">Enter weight</span>
+        <button class="voice-btn" onclick="speak('Enter approximate weight in kilograms')">🔊</button>
+      </header>
+      <div class="app-content" style="text-align: center;">
+        <p class="body-sm text-muted mb-2">Approximate weight (kg)</p>
+        <div class="weight-display" id="weightDisplay">0.0</div>
+        <div class="weight-pad">
+          <button onclick="appendWeight('1')">1</button>
+          <button onclick="appendWeight('2')">2</button>
+          <button onclick="appendWeight('3')">3</button>
+          <button onclick="appendWeight('4')">4</button>
+          <button onclick="appendWeight('5')">5</button>
+          <button onclick="appendWeight('6')">6</button>
+          <button onclick="appendWeight('7')">7</button>
+          <button onclick="appendWeight('8')">8</button>
+          <button onclick="appendWeight('9')">9</button>
+          <button onclick="appendWeight('.')">.</button>
+          <button onclick="appendWeight('0')">0</button>
+          <button onclick="clearWeight()">⌫</button>
+        </div>
+        <button class="btn btn-primary btn-lg btn-block mt-4" onclick="goTo('value')" id="weightNext" disabled>
+          Continue →
+        </button>
+      </div>
+    </div>
+
+    <!-- ========== VALUE ========== -->
+    <div class="screen" id="screen-value">
+      <header class="app-header">
+        <button class="btn-ghost" onclick="goTo('weight')" style="font-size: 1.25rem;">←</button>
+        <span style="font-weight: 600;" data-i18n="col_price_radar">Fair Price Radar</span>
+        <button class="voice-btn" onclick="speakFairPrice()">🔊</button>
+      </header>
+      <div class="app-content" style="text-align: center;">
+        <div class="card card-body" style="margin-bottom: 1.25rem;">
+          <div class="badge badge-info mb-3">Indicative · not guaranteed</div>
+          <div class="body-sm text-muted" id="valueMaterial">PCB · 3.5 kg</div>
+          <div class="price" style="margin: 0.75rem 0;">₹380 – ₹420</div>
+          <div class="heading-2" style="color: var(--color-text);">Est. lot value</div>
+          <div class="price" style="font-size: 2rem;" id="estValue">₹1,330 – ₹1,470</div>
+          <p class="caption mt-2">Updated 2 hours ago · based on local rates</p>
+        </div>
+        <button class="btn btn-primary btn-lg btn-block" onclick="goTo('match')">
+          Get exact offers →
+        </button>
+        <button class="btn btn-ghost btn-block mt-2" onclick="goTo('home')">Save for later</button>
+      </div>
+    </div>
+
+    <!-- ========== MATCH ========== -->
+    <div class="screen" id="screen-match">
+      <header class="app-header">
+        <button class="btn-ghost" onclick="goTo('value')" style="font-size: 1.25rem;">←</button>
+        <span style="font-weight: 600;" data-i18n="col_matched_recyclers">Matched recyclers</span>
+        <span></span>
+      </header>
+      <div class="app-content">
+        <div class="sort-chips">
+          <button class="chip active" data-sort="blend">Best match</button>
+          <button class="chip" data-sort="near">Nearest</button>
+          <button class="chip" data-sort="price" data-i18n="col_best_price">Best price</button>
+          <button class="chip" data-sort="pickup">Pickup available</button>
+        </div>
+
+        <div class="recycler-card" onclick="requestQuote('GreenCycle')">
+          <div class="recycler-rank">1</div>
+          <div style="flex: 1;">
+            <div style="font-weight: 600;">GreenCycle Recycling</div>
+            <div class="body-sm text-muted">2.1 km · Authorized ✓</div>
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.35rem; flex-wrap: wrap;">
+              <span class="badge badge-go">₹410/kg</span>
+              <span class="badge badge-info">Pickup today</span>
+            </div>
+          </div>
+          <span style="font-size: 1.25rem;">→</span>
+        </div>
+
+        <div class="recycler-card" onclick="requestQuote('EcoMetal')">
+          <div class="recycler-rank">2</div>
+          <div style="flex: 1;">
+            <div style="font-weight: 600;">EcoMetal Hub</div>
+            <div class="body-sm text-muted">4.8 km · Authorized ✓</div>
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.35rem; flex-wrap: wrap;">
+              <span class="badge badge-go">₹395/kg</span>
+              <span class="badge badge-caution">Self-drop only</span>
+            </div>
+          </div>
+          <span style="font-size: 1.25rem;">→</span>
+        </div>
+
+        <div class="recycler-card" onclick="requestQuote('PureRecycle')">
+          <div class="recycler-rank">3</div>
+          <div style="flex: 1;">
+            <div style="font-weight: 600;">PureRecycle Pvt Ltd</div>
+            <div class="body-sm text-muted">6.2 km · Authorized ✓</div>
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.35rem; flex-wrap: wrap;">
+              <span class="badge badge-go">₹420/kg</span>
+              <span class="badge badge-info">Pickup tomorrow</span>
+            </div>
+          </div>
+          <span style="font-size: 1.25rem;">→</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== ARRANGE ========== -->
+    <div class="screen" id="screen-arrange">
+      <header class="app-header">
+        <button class="btn-ghost" onclick="goTo('match')" style="font-size: 1.25rem;">←</button>
+        <span style="font-weight: 600;">Confirm arrangement</span>
+        <span></span>
+      </header>
+      <div class="app-content">
+        <div class="card card-body mb-4">
+          <div class="heading-3" id="arrangeName">GreenCycle Recycling</div>
+          <div class="body-sm text-muted mt-1">Offered ₹410 / kg · Pickup available</div>
+          <div class="price mt-3" style="font-size: 1.75rem;">Est. ₹1,435</div>
+          <p class="caption">for 3.5 kg PCB</p>
+        </div>
+        <p class="body-sm text-muted mb-2">Choose handover method</p>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.5rem;">
+          <button class="action-card" id="optPickup" onclick="selectHandover('pickup')" style="border-color: var(--color-go); background: var(--color-go-light);">
+            <span class="icon">🚚</span>
+            <span class="label">Pickup</span>
+          </button>
+          <button class="action-card" id="optDrop" onclick="selectHandover('drop')">
+            <span class="icon">🏃</span>
+            <span class="label">Self-drop</span>
+          </button>
+        </div>
+        <div class="card card-body mb-4">
+          <div class="body-sm text-muted">Suggested window</div>
+          <div class="heading-3 mt-1">Today, 4:00 – 6:00 PM</div>
+        </div>
+        <button class="btn btn-primary btn-lg btn-block" onclick="goTo('handover')">
+          Confirm & generate QR →
+        </button>
+      </div>
+    </div>
+
+    <!-- ========== HANDOVER / QR ========== -->
+    <div class="screen" id="screen-handover">
+      <header class="app-header">
+        <button class="btn-ghost" onclick="goTo('arrange')" style="font-size: 1.25rem;">←</button>
+        <span style="font-weight: 600;">QR E-waste Passport</span>
+        <span></span>
+      </header>
+      <div class="app-content" style="text-align: center;">
+        <p class="body-sm text-muted mb-2" data-i18n="col_handover_hint">Show this to the recycler to confirm handover</p>
+        <div class="qr-box">▦</div>
+        <div class="caption mb-3">LOT-A7F3 · PCB · 3.5 kg · ₹1,435</div>
+        <div class="card card-body" style="text-align: left; margin-bottom: 1.25rem;">
+          <div class="body-sm"><strong>Photos:</strong> 1 attached</div>
+          <div class="body-sm mt-1"><strong>GPS:</strong> 19.0760° N, 72.8777° E</div>
+          <div class="body-sm mt-1"><strong>Time:</strong> Just now</div>
+          <div class="body-sm mt-1"><strong data-i18n="col_status">Status:</strong> <span class="badge badge-caution" data-i18n="portal_awaiting_scan">Awaiting recycler scan</span></div>
+        </div>
+        <button class="btn btn-primary btn-lg btn-block" onclick="confirmHandover()">
+          Simulate recycler scan ✓
+        </button>
+      </div>
+    </div>
+
+    <!-- ========== CONFIRMATION ========== -->
+    <div class="screen" id="screen-done">
+      <header class="app-header">
+        <span></span>
+        <span style="font-weight: 600;">Handover complete</span>
+        <span></span>
+      </header>
+      <div class="app-content" style="text-align: center; padding-top: 2rem;">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">✅</div>
+        <h2 class="heading-1 mb-2">Payment recorded</h2>
+        <div class="price" style="margin-bottom: 0.5rem;">₹1,435</div>
+        <p class="body-sm text-muted mb-4">Cash · GreenCycle Recycling</p>
+        <div class="card card-body mb-4" style="text-align: left;">
+          <div class="flex justify-between body-sm">
+            <span>Completed balance</span>
+            <strong>₹8,240</strong>
+          </div>
+          <div class="flex justify-between body-sm mt-2">
+            <span>Pending</span>
+            <strong>₹0</strong>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-lg btn-block" onclick="goTo('home')">
+          Back to home
+        </button>
+      </div>
+    </div>
+
+    <!-- ========== LOTS ========== -->
+    <div class="screen" id="screen-lots">
+      <header class="app-header">
+        <button class="btn-ghost" onclick="goTo('home')" style="font-size: 1.25rem;">←</button>
+        <span style="font-weight: 600;" data-i18n="col_my_lots">My lots</span>
+        <span></span>
+      </header>
+      <div class="app-content">
+        <div class="lot-card">
+          <div class="status-stepper">
+            <div class="step done"><div class="step-dot">✓</div><span class="step-label">Collected</span></div>
+            <div class="step done"><div class="step-dot">✓</div><span class="step-label">Matched</span></div>
+            <div class="step active"><div class="step-dot">3</div><span class="step-label">Pickup</span></div>
+            <div class="step"><div class="step-dot">4</div><span class="step-label">Handover</span></div>
+          </div>
+          <div class="flex justify-between items-center">
+            <div>
+              <div style="font-weight: 600;">PCB · 3.5 kg</div>
+              <div class="body-sm text-muted">Est. ₹1,435 · GreenCycle</div>
+            </div>
+            <span class="badge badge-info">Today 4–6 PM</span>
+          </div>
+        </div>
+        <div class="lot-card">
+          <div class="status-stepper">
+            <div class="step done"><div class="step-dot">✓</div><span class="step-label">Collected</span></div>
+            <div class="step done"><div class="step-dot">✓</div><span class="step-label">Matched</span></div>
+            <div class="step done"><div class="step-dot">✓</div><span class="step-label">Pickup</span></div>
+            <div class="step done"><div class="step-dot">✓</div><span class="step-label">Handover</span></div>
+          </div>
+          <div class="flex justify-between items-center">
+            <div>
+              <div style="font-weight: 600;">Cable · 8 kg</div>
+              <div class="body-sm text-muted">₹960 · EcoMetal Hub</div>
+            </div>
+            <span class="badge badge-go">Completed</span>
+          </div>
+        </div>
+        <div class="lot-card">
+          <div class="status-stepper">
+            <div class="step done"><div class="step-dot">✓</div><span class="step-label">Collected</span></div>
+            <div class="step"><div class="step-dot">2</div><span class="step-label">Matched</span></div>
+            <div class="step"><div class="step-dot">3</div><span class="step-label">Pickup</span></div>
+            <div class="step"><div class="step-dot">4</div><span class="step-label">Handover</span></div>
+          </div>
+          <div class="flex justify-between items-center">
+            <div>
+              <div style="font-weight: 600;">Battery · 2.1 kg</div>
+              <div class="body-sm text-muted">Est. ₹420 · Offline</div>
+            </div>
+            <span class="badge badge-offline">Sync pending</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== EARNINGS ========== -->
+    <div class="screen" id="screen-earnings">
+      <header class="app-header">
+        <button class="btn-ghost" onclick="goTo('home')" style="font-size: 1.25rem;">←</button>
+        <span style="font-weight: 600;" data-i18n="col_my_earnings">My earnings</span>
+        <span></span>
+      </header>
+      <div class="app-content">
+        <div class="ledger-total">₹8,240</div>
+        <p class="text-center body-sm text-muted mb-4">This month</p>
+        <div class="ledger-split">
+          <div class="card">
+            <div class="body-sm text-muted">Completed</div>
+            <div class="heading-2" style="color: var(--color-go);">₹7,820</div>
+          </div>
+          <div class="card">
+            <div class="body-sm text-muted">Pending</div>
+            <div class="heading-2" style="color: var(--color-caution);">₹420</div>
+          </div>
+        </div>
+        <h3 class="heading-3 mb-3">By material</h3>
+        <div class="lot-card flex justify-between items-center">
+          <div><span style="font-size: 1.25rem;">🔌</span> PCB</div>
+          <strong>₹4,120</strong>
+        </div>
+        <div class="lot-card flex justify-between items-center">
+          <div><span style="font-size: 1.25rem;">🔌</span> Cable</div>
+          <strong>₹2,680</strong>
+        </div>
+        <div class="lot-card flex justify-between items-center">
+          <div><span style="font-size: 1.25rem;">🔋</span> Battery</div>
+          <strong>₹1,020</strong>
+        </div>
+        <div class="lot-card flex justify-between items-center">
+          <div><span style="font-size: 1.25rem;">⚙️</span> Motor</div>
+          <strong>₹420</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== PRICE CHECK ========== -->
+    <div class="screen" id="screen-price">
+      <header class="app-header">
+        <button class="btn-ghost" onclick="goTo('home')" style="font-size: 1.25rem;">←</button>
+        <span style="font-weight: 600;" data-i18n="col_price_radar">Fair Price Radar</span>
+        <button class="voice-btn" onclick="speak('PCB 380 to 420 rupees per kilo')">🔊</button>
+      </header>
+      <div class="app-content">
+        <p class="body-sm text-muted mb-3">Indicative ranges for your area · updated today</p>
+        <div class="price-board mb-3">
+          <div class="material">PCB</div>
+          <div class="range">₹380 – ₹420 / kg</div>
+          <div class="updated">Indicative · 2 hrs ago</div>
+        </div>
+        <div class="price-board mb-3">
+          <div class="material">Cable (Cu)</div>
+          <div class="range">₹110 – ₹130 / kg</div>
+          <div class="updated">Indicative · 2 hrs ago</div>
+        </div>
+        <div class="price-board mb-3">
+          <div class="material">Battery (Li-ion)</div>
+          <div class="range">₹180 – ₹220 / kg</div>
+          <div class="updated">Indicative · 3 hrs ago</div>
+        </div>
+        <div class="price-board mb-3">
+          <div class="material">Motor</div>
+          <div class="range">₹45 – ₹60 / kg</div>
+          <div class="updated">Indicative · 1 day ago</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom nav (kept for the shared goTo logic; hidden on desktop) -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-screen="home" onclick="goTo('home')">
+        <span class="icon">🏠</span>
+        <span data-i18n="col_home">Home</span>
+      </button>
+      <button class="nav-item" data-screen="lots" onclick="goTo('lots')">
+        <span class="icon">📦</span>
+        <span data-i18n="col_lots">My lots</span>
+      </button>
+      <button class="nav-item" data-screen="earnings" onclick="goTo('earnings')">
+        <span class="icon">📊</span>
+        <span data-i18n="col_earnings">Earnings</span>
+      </button>
+    </nav>
+  </div><!-- /.app-shell -->
+        </div><!-- /.kc-panel -->
+      </div><!-- /.kc-stage -->
+    </div><!-- /.kc-workspace -->
+  </div><!-- /.kc-page -->
+
+  <script src="../js/nav.js"></script>
+  <script src="../js/i18n.js"></script>
+  <script src="../js/main.js"></script>
+  <script>
+    function logoutToLogin() {
+      window.location.href = "login.html";
+    }
+
+    let weightStr = "";
+    let selectedCategory = "PCB";
+    let handoverType = "pickup";
+
+    function goTo(name) {
+      document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+      const el = document.getElementById("screen-" + name);
+      if (el) el.classList.add("active");
+      // sync both the (hidden) bottom-nav and the desktop left rail
+      document.querySelectorAll(".nav-item, .rail-item").forEach(n => {
+        n.classList.toggle("active", n.getAttribute("data-screen") === name);
+      });
+      // scroll the panel into view on desktop rather than jumping the whole page
+      var panel = document.querySelector(".kc-panel");
+      if (panel && window.matchMedia("(max-width:900px)").matches) {
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+
+    function capturePhoto() {
+      goTo("category");
+      if (window.KC && KC.showToast) KC.showToast("Photo captured · AI classifying…");
+    }
+
+    function selectCategory(cat) {
+      selectedCategory = cat;
+      document.getElementById("valueMaterial").textContent = cat + " · 3.5 kg";
+      goTo("weight");
+    }
+
+    function appendWeight(d) {
+      if (d === "." && weightStr.includes(".")) return;
+      if (weightStr.length > 5) return;
+      weightStr += d;
+      updateWeightUI();
+    }
+
+    function clearWeight() {
+      weightStr = weightStr.slice(0, -1);
+      updateWeightUI();
+    }
+
+    function updateWeightUI() {
+      const v = weightStr || "0";
+      document.getElementById("weightDisplay").textContent = v.includes(".") ? v : v + ".0";
+      document.getElementById("weightNext").disabled = !(parseFloat(v) > 0);
+      const w = parseFloat(v) || 0;
+      const min = Math.round(w * 380);
+      const max = Math.round(w * 420);
+      document.getElementById("estValue").textContent = "₹" + min.toLocaleString() + " – ₹" + max.toLocaleString();
+      document.getElementById("valueMaterial").textContent = selectedCategory + " · " + (v || "0") + " kg";
+    }
+
+    function requestQuote(name) {
+      document.getElementById("arrangeName").textContent = name;
+      goTo("arrange");
+    }
+
+    function selectHandover(type) {
+      handoverType = type;
+      document.getElementById("optPickup").style.borderColor = type === "pickup" ? "var(--color-go)" : "var(--color-border)";
+      document.getElementById("optPickup").style.background = type === "pickup" ? "var(--color-go-light)" : "";
+      document.getElementById("optDrop").style.borderColor = type === "drop" ? "var(--color-go)" : "var(--color-border)";
+      document.getElementById("optDrop").style.background = type === "drop" ? "var(--color-go-light)" : "";
+    }
+
+    function confirmHandover() {
+      goTo("done");
+      if (window.KC && KC.showToast) KC.showToast("Handover confirmed · Ledger updated");
+    }
+
+    function speak(text) {
+      if ("speechSynthesis" in window) {
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = (window.KC && KC.currentLang() === "hi") ? "hi-IN" : (window.KC && KC.currentLang() === "mr") ? "mr-IN" : "en-IN";
+        speechSynthesis.speak(u);
+      }
+    }
+
+    function speakPrice() {
+      speak("आज की कमाई एक हजार आठ सौ चालीस रुपये");
+    }
+
+    function speakFairPrice() {
+      const lang = window.KC ? KC.currentLang() : "en";
+      if (lang === "hi") speak("आज पीसीबी का भाव तीन सौ अस्सी से चार सौ बीस रुपये किलो है");
+      else if (lang === "mr") speak("आज पीसीबीचा भाव तीनशे ऐंशी ते चारशे वीस रुपये किलो आहे");
+      else speak("Today PCB rate is three hundred eighty to four hundred twenty rupees per kilo");
+    }
+
+    // Sort chips
+    document.querySelectorAll(".chip").forEach(c => {
+      c.addEventListener("click", () => {
+        document.querySelectorAll(".chip").forEach(x => x.classList.remove("active"));
+        c.classList.add("active");
+      });
+    });
+
+    // Simulate offline toggle for demo
+    let offline = true;
+    setInterval(() => {
+      // keep banner visible for demo
+    }, 10000);
+  </script>
+</body>
+</html>

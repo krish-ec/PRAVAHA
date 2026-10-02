@@ -1,0 +1,462 @@
+/* ============================================================
+  PRAVAHA — Shared page theme bridge
+   Makes the collector / recycler / admin pages use the EXACT
+   same palette as index.html, in both light and dark.
+   Load this AFTER css/styles.css so these overrides win.
+   Theme is driven by html[data-theme="light|dark"] and shares
+   the localStorage key "kc-theme" with the landing page.
+   ============================================================ */
+
+/* ---- index palette, remapped onto styles.css --color-* tokens ---- */
+:root,
+html[data-theme="light"] {
+  /* index tokens (so components can use them directly too) */
+  --bg:#F3F6F2;
+  --bg-2:#EAEEE7;
+  --panel:#FFFFFF;
+  --panel-2:#F6F8F4;
+  --ink:#141F1B;
+  --ink-dim:#4C5851;
+  --ink-faint:#8B958C;
+  --border-soft:rgba(20,31,27,0.12);
+  --border-hard:rgba(20,31,27,0.22);
+  --copper:#B85A28;
+  --copper-ink:#8f4720;
+  --verdigris:#2F7D62;
+  --steel:#6A7B88;
+  --ochre:#A97C1E;
+
+  /* remap of styles.css tokens -> index palette
+     (copper is the primary accent, matching index) */
+  --color-go:#B85A28;
+  --color-go-dark:#8f4720;
+  --color-go-light:#F5E7DD;
+  --color-text:#141F1B;
+  --color-text-muted:#4C5851;
+  --color-surface:#F3F6F2;
+  --color-surface-elevated:#FFFFFF;
+  --color-caution:#A97C1E;
+  --color-caution-bg:#F7EFDD;
+  --color-hazard:#B3261E;
+  --color-hazard-bg:#F8E7E4;
+  --color-info:#2F7D62;
+  --color-info-bg:#E4F1EB;
+  --color-border:rgba(20,31,27,0.12);
+  --color-offline:#8B958C;
+
+  --font-display:'Space Grotesk', 'Inter', sans-serif;
+
+  --kc-shadow:0 1px 2px rgba(20,31,27,0.06), 0 12px 32px -16px rgba(20,31,27,0.18);
+  --kc-surface-inset:rgba(20,31,27,0.03);
+  --kc-demo-bg:#0E1614;
+  --kc-demo-ink:#F3F6F2;
+}
+
+html[data-theme="dark"] {
+  --bg:#101613;
+  --bg-2:#161D19;
+  --panel:#1A211D;
+  --panel-2:#1F2721;
+  --ink:#ECF2EE;
+  --ink-dim:#A9B6AE;
+  --ink-faint:#69766F;
+  --border-soft:rgba(236,242,238,0.10);
+  --border-hard:rgba(236,242,238,0.18);
+  --copper:#E0824A;
+  --copper-ink:#f2a06e;
+  --verdigris:#57BE97;
+  --steel:#9BAAB5;
+  --ochre:#D8B04A;
+
+  --color-go:#E0824A;
+  --color-go-dark:#c96f3b;
+  --color-go-light:rgba(224,130,74,0.14);
+  --color-text:#ECF2EE;
+  --color-text-muted:#A9B6AE;
+  --color-surface:#101613;
+  --color-surface-elevated:#1A211D;
+  --color-caution:#D8B04A;
+  --color-caution-bg:rgba(216,176,74,0.14);
+  --color-hazard:#F08A7E;
+  --color-hazard-bg:rgba(240,138,126,0.14);
+  --color-info:#57BE97;
+  --color-info-bg:rgba(87,190,151,0.14);
+  --color-border:rgba(236,242,238,0.12);
+  --color-offline:#69766F;
+
+  --kc-shadow:0 1px 2px rgba(0,0,0,0.3), 0 12px 32px -16px rgba(0,0,0,0.5);
+  --kc-surface-inset:rgba(255,255,255,0.02);
+  --kc-demo-bg:#0E1614;
+  --kc-demo-ink:#F3F6F2;
+}
+
+/* smooth theme cross-fade — scoped to color properties only (never layout),
+   so switching light/dark eases instead of snapping, with no reflow jank */
+html, body { transition: background-color .35s cubic-bezier(.22,.68,0,1), color .35s cubic-bezier(.22,.68,0,1); }
+body { background: var(--color-surface); color: var(--color-text); }
+.site-header, .kc-panel, .kc-rail, .kc-rail .rail-item,
+.card, .portal-sidebar, .portal-main, .metric-card, .lot-card,
+.recycler-card, .price-board, .weight-pad button, .cat-option, .chip,
+.rec-panel, .ops-card, .stat-card, .quote-input, input, textarea, select {
+  transition: background-color .35s cubic-bezier(.22,.68,0,1), color .35s cubic-bezier(.22,.68,0,1), border-color .35s cubic-bezier(.22,.68,0,1);
+}
+@media (prefers-reduced-motion: reduce){
+  html, body { transition:none; }
+}
+
+/* ------------------------------------------------------------
+   Compatibility aliases
+   Map a few token names used in index's inline CSS to the
+   tokens exposed by `css/styles.css` so collector/recycler
+   pages pick up the same radii, shadows and panel tokens.
+   This keeps pages visually consistent without changing
+   the existing component CSS.
+   ------------------------------------------------------------ */
+:root, html[data-theme="light"], html[data-theme="dark"] {
+  /* radius aliases (styles.css uses --radius-*) */
+  --radius-s: var(--radius-sm, 8px);
+  --radius-m: var(--radius-md, 12px);
+  --radius-l: var(--radius-lg, 16px);
+
+  /* shadow aliases */
+  --shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.06));
+  --shadow-lg: var(--shadow-lg, 0 12px 32px rgba(0,0,0,0.12));
+
+  /* panel / background / ink tokens used by index's CSS */
+  --panel: var(--color-surface-elevated, #fff);
+  --panel-2: var(--color-surface, #F3F6F2);
+  --bg: var(--color-surface, #F3F6F2);
+  --bg-2: var(--color-surface-elevated, #FFFFFF);
+
+  /* readable text tokens */
+  --ink: var(--color-text, #111);
+  --ink-dim: var(--color-text-muted, #666);
+  --ink-faint: var(--color-text-muted, #9A9A9A);
+  /* font aliases to match landing's headings and body fonts */
+  --font-body: var(--font-sans, 'Inter', system-ui, sans-serif);
+  --font-display: var(--font-display, 'Space Grotesk', 'Inter', sans-serif);
+
+  /* additional shadow aliases used by component styles */
+  --shadow-md: var(--shadow-md, 0 4px 12px rgba(0,0,0,0.08));
+  --shadow-sm: var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.06));
+}
+
+/* display font on headings/prices to match index */
+.display, .heading-1, .heading-2, .heading-3,
+.price, .ledger-total, .weight-display,
+.ops-card .num, .stat-card .num { font-family: var(--font-display); }
+
+/* Shared icon treatment for portal pages: match index.html's line-icon language
+   and keep icon/text baselines stable across platforms and languages. */
+.page-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  display: inline-block;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: middle;
+}
+.icon-label { display: inline-flex; align-items: center; gap: .55rem; min-width: 0; }
+.icon-label > span:last-child { min-width: 0; }
+.kc-page-head > div:first-child { min-width: 0; }
+.kc-page-head h1 { text-wrap: balance; }
+.kc-page-head p { max-width: 42rem; }
+.admin-layout { min-width: 0; }
+.admin-layout .heading-1,
+.admin-layout .heading-2,
+.admin-layout .heading-3 { text-wrap: balance; }
+.admin-layout .funnel-stage { min-width: 0; }
+.admin-layout .funnel-stage .label { min-width: 0; overflow-wrap: anywhere; }
+
+@media (max-width: 640px) {
+  .admin-layout { padding: 1rem .9rem 2.5rem; }
+  .admin-layout > header { margin-bottom: 1.5rem !important; }
+  .admin-layout .heading-1 { font-size: clamp(1.55rem, 7vw, 2rem); }
+  .admin-layout .funnel-stage { gap: .65rem; padding: .75rem .85rem; }
+  .admin-layout .funnel-stage .bar-wrap { width: 72px; flex: 0 0 72px; }
+  .admin-layout .funnel-stage .count { min-width: 36px; }
+  .admin-layout .admin-split { gap: 1rem !important; }
+}
+
+/* ---- demo bar: fixed dark strip in both themes (was tied to --color-text) ---- */
+.demo-bar { background: var(--kc-demo-bg) !important; color: var(--kc-demo-ink) !important; }
+.demo-bar a { color: var(--verdigris) !important; font-weight: 600; }
+
+/* ---- recycler portal sidebar: stays dark with light text in both themes ---- */
+.portal-sidebar { background: #0E1614; color: #F3F6F2; }
+.portal-sidebar .logo { color: #F3F6F2; }
+.portal-nav a { color: rgba(243,246,242,0.72); }
+.portal-nav a:hover, .portal-nav a.active { color: #fff; background: rgba(255,255,255,0.10); }
+
+/* ---- form inputs pick up the theme (default UA white breaks dark mode) ---- */
+input, textarea, select, .quote-input {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+input::placeholder, textarea::placeholder, .quote-input::placeholder { color: var(--color-text-muted); }
+
+/* Theme-icon visibility is defined under .site-header below (single navbar).
+   Base default: hide both until the header rules choose one. */
+.theme-icon { display: none; }
+
+/* ============================================================
+   Shared index-style navigation bar (collector / recycler / admin)
+   Mirrors index.html's .site-header, driven by the theme tokens.
+   ============================================================ */
+.kc-ease{--ease:cubic-bezier(.22,.68,0,1);}
+.site-header{
+  position:sticky; top:0; z-index:100;
+  background:color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+  border-bottom:1px solid transparent;
+  transition:border-color .3s, background .3s;
+}
+.site-header.scrolled{border-bottom-color:var(--color-border);}
+.site-header .header-inner{
+  max-width:1180px; margin:0 auto; padding:0 clamp(1.25rem,4vw,2.5rem);
+  display:flex; align-items:center; justify-content:space-between; height:68px; gap:1.5rem;
+}
+.site-header .logo{display:flex; align-items:center; font-family:var(--font-display); font-weight:600; font-size:1.02rem; color:var(--ink); flex-shrink:0; text-decoration:none;}
+.brand-logo{display:block; width:auto; height:42px; object-fit:contain; flex-shrink:0;}
+html[data-theme="dark"] .brand-logo{background:transparent; border-radius:0;}
+@media (max-width:720px){ .brand-logo{height:36px;} }
+
+/* match the homepage: light shows sun, dark shows moon */
+.site-header .theme-icon{display:none;}
+html[data-theme="light"] .site-header .theme-icon-sun{display:flex;}
+html[data-theme="dark"]  .site-header .theme-icon-moon{display:flex;}
+/* Desktop nav links — identical to the homepage's .nav-links */
+.site-header .nav-links{display:flex; align-items:center; gap:1.9rem;}
+.site-header .nav-links a{font-size:.92rem; font-weight:500; color:var(--ink-dim); position:relative; padding:.3rem 0; text-decoration:none; transition:color .2s;}
+.site-header .nav-links a:hover{color:var(--ink);}
+.site-header .nav-links a.current{color:var(--copper);}
+.site-header .nav-links a::after{content:""; position:absolute; left:0; right:0; bottom:-2px; height:2px; background:var(--copper); transform:scaleX(0); transform-origin:left; transition:transform .25s var(--ease,cubic-bezier(.22,.68,0,1));}
+.site-header .nav-links a:hover::after,.site-header .nav-links a.current::after{transform:scaleX(1);}
+
+/* "Try live demo" — same style as the others, arrow slides in on hover */
+.site-header .nav-links a.nav-demo,.site-header .mobile-nav a.nav-demo{padding-right:1.1em;}
+.site-header .nav-links a.nav-demo::before{content:"\2192"; position:absolute; right:0; top:50%; transform:translate(-4px,-50%); opacity:0; transition:transform .25s var(--ease,cubic-bezier(.22,.68,0,1)), opacity .25s var(--ease,cubic-bezier(.22,.68,0,1));}
+.site-header .nav-links a.nav-demo:hover{padding-right:1.4em;}
+.site-header .nav-links a.nav-demo:hover::before{opacity:1; transform:translate(0,-50%);}
+
+.site-header .header-actions{display:flex; align-items:center; gap:.6rem;}
+.site-header .lang-toggle{display:flex; background:var(--panel-2); border:1px solid var(--color-border); border-radius:999px; padding:3px; gap:2px; transform:none;}
+.site-header .lang-btn{padding:.35rem .65rem; border-radius:999px; font-size:.78rem; font-weight:600; color:var(--ink-faint); background:transparent; border:none; cursor:pointer; transition:background .2s, color .2s;}
+.site-header .lang-btn.active{background:var(--panel); color:var(--ink); box-shadow:var(--kc-shadow);}
+.site-header .theme-toggle{width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:1px solid var(--color-border); color:var(--ink-dim); background:transparent; cursor:pointer; transition:border-color .2s, color .2s;}
+.site-header .theme-toggle:hover{border-color:var(--copper); color:var(--copper); background:transparent;}
+.site-header .theme-toggle .icon{width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
+
+/* hamburger + mobile menu — identical to the homepage */
+.site-header .nav-toggle{display:none; width:38px; height:38px; align-items:center; justify-content:center; border:1px solid var(--color-border); border-radius:10px; color:var(--ink); background:transparent; cursor:pointer;}
+.site-header .nav-toggle .icon{width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
+.site-header .mobile-nav{display:none;}
+@media (max-width:880px){
+  .site-header .nav-links{display:none;}
+  .site-header .nav-toggle{display:flex;}
+  .site-header .header-actions .lang-toggle{display:none;}
+  .site-header .mobile-nav{
+    display:flex; flex-direction:column; gap:1.1rem;
+    position:fixed; inset:68px 0 auto 0; z-index:90;
+    background:var(--bg); border-bottom:1px solid var(--color-border);
+    padding:1.25rem clamp(1.25rem,4vw,2.5rem) 1.75rem;
+    transform:translateY(-8px); opacity:0; pointer-events:none;
+    transition:transform .25s var(--ease,cubic-bezier(.22,.68,0,1)), opacity .25s var(--ease,cubic-bezier(.22,.68,0,1));
+  }
+  .site-header .mobile-nav.open{transform:translateY(0); opacity:1; pointer-events:auto;}
+  .site-header .mobile-nav a{font-size:1.02rem; font-weight:500; color:var(--ink); position:relative; text-decoration:none;}
+  .site-header .mobile-nav .lang-toggle{display:flex; align-self:flex-start;}
+}
+
+/* Homepage-matching footer */
+.site-footer{background:var(--panel); color:var(--ink); padding:5.5rem 0 2rem; border-top:1px solid var(--border); margin-top:2rem; position:relative; z-index:1;}
+.site-footer .container{max-width:1180px; margin:0 auto; padding:0 clamp(1.25rem,4vw,2.5rem);}
+.footer-statement{font-family:var(--font-display); font-weight:600; font-size:clamp(1.7rem,3.6vw,2.6rem); line-height:1.15; margin-bottom:3.5rem; max-width:36rem; color:var(--ink);}
+.site-footer .footer-statement.reveal-up{opacity:1; transform:none;}
+.footer-statement .accent{color:var(--copper);}
+.footer-grid{display:grid; grid-template-columns:1.4fr 1fr 1fr 1fr; gap:2.5rem; padding-bottom:3rem; border-bottom:1px solid var(--border);}
+@media (max-width:760px){ .footer-grid{grid-template-columns:1fr 1fr;} }
+.footer-brand .logo{margin-bottom:.9rem;}
+.footer-brand p{color:var(--ink-dim); font-size:.88rem; max-width:20rem;}
+.footer-col h4{font-size:.78rem; font-weight:700; letter-spacing:.03em; color:var(--ink-faint); margin:0 0 .9rem;}
+.footer-col a{display:block; font-size:.9rem; color:var(--ink-dim); margin-bottom:.65rem; text-decoration:none;}
+.footer-col a:hover{color:var(--copper);}
+.footer-bottom{display:flex; justify-content:space-between; flex-wrap:wrap; gap:.6rem; padding-top:1.4rem; font-size:.8rem; color:var(--ink-faint);}
+@media (prefers-reduced-motion: reduce){
+  .site-header .nav-links a.nav-demo::before{transition:none;}
+  .site-header .mobile-nav{transition:none;}
+}
+
+/* ============================================================
+   Collector — desktop workspace (replaces the phone frame)
+   Keeps every existing screen + JS; just reframes them wide.
+   ============================================================ */
+body.kc-desktop{background:var(--color-surface); color:var(--color-text);}
+.kc-page{max-width:1120px; margin:0 auto; padding:2.25rem clamp(1.25rem,4vw,2.5rem) 4rem;}
+.kc-page-head{display:flex; align-items:flex-end; justify-content:space-between; gap:1.5rem; flex-wrap:wrap; margin-bottom:1.75rem;}
+.kc-page-head h1{font-family:var(--font-display); font-weight:600; font-size:clamp(1.7rem,3vw,2.3rem); line-height:1.1; margin:0; color:var(--color-text);}
+.kc-page-head p{margin:.35rem 0 0; color:var(--color-text-muted); font-size:.95rem;}
+.kc-eyebrow{display:inline-flex; align-items:center; gap:.5rem; font-family:var(--font-display); font-size:.78rem; font-weight:600; color:var(--copper); margin-bottom:.5rem;}
+.kc-eyebrow::before{content:""; width:7px; height:7px; border-radius:50%; background:var(--verdigris);}
+
+/* offline pill in the desktop header row */
+.kc-offline{display:inline-flex; align-items:center; gap:.5rem; font-size:.82rem; font-weight:600; color:var(--color-caution); background:var(--color-caution-bg); border:1px solid var(--color-caution); padding:.4rem .8rem; border-radius:999px;}
+
+/* the two-column desktop workspace: step rail + active panel */
+.kc-workspace{display:grid; grid-template-columns:260px minmax(0,1fr); gap:1.75rem; align-items:start;}
+@media (max-width:900px){ .kc-workspace{grid-template-columns:1fr;} }
+
+/* left rail = the former bottom-nav + a flow guide */
+.kc-rail{position:sticky; top:88px; display:flex; flex-direction:column; gap:.4rem; background:var(--panel); border:1px solid var(--color-border); border-radius:var(--radius-l,20px); padding:.75rem; box-shadow:var(--kc-shadow);}
+@media (max-width:900px){ .kc-rail{position:static; flex-direction:row; overflow-x:auto;} }
+.kc-rail .rail-item{display:flex; align-items:center; gap:.7rem; padding:.7rem .8rem; border-radius:12px; border:none; background:transparent; color:var(--color-text-muted); font-size:.9rem; font-weight:600; cursor:pointer; width:100%; text-align:left; transition:background .2s, color .2s; white-space:nowrap;}
+.kc-rail .rail-item .icon{font-size:1.15rem;}
+.kc-rail .rail-item:hover{background:var(--color-go-light); color:var(--color-text);}
+.kc-rail .rail-item.active{background:var(--color-go-light); color:var(--copper-ink);}
+.kc-rail-sep{height:1px; background:var(--color-border); margin:.4rem .3rem;}
+
+/* right column = the active screen, in a professional panel */
+.kc-stage{min-width:0;}
+.kc-panel{background:var(--panel); border:1px solid var(--color-border); border-radius:var(--radius-l,20px); box-shadow:var(--kc-shadow); overflow:hidden; min-height:520px;}
+.kc-panel .app-header{background:var(--panel); border-bottom:1px solid var(--color-border);}
+.kc-panel .app-content{padding:1.5rem 1.75rem 1.75rem; padding-bottom:1.75rem; max-width:none;}
+@media (min-width:900px){
+  /* give the flow room to breathe on desktop */
+  .kc-panel .app-content{padding:2rem 2.25rem 2.25rem;}
+  .kc-panel .action-grid{grid-template-columns:repeat(4,1fr);}
+}
+
+/* 30% — subtle, purposeful motion.
+   Screen switch is a gentle opacity-only fade (no translateY) so the panel
+   never jumps as screens of different heights swap in. */
+.kc-panel .screen{display:none;}
+.kc-panel .screen.active{display:block; animation:kcScreenIn .28s ease both;}
+@keyframes kcScreenIn{from{opacity:0;} to{opacity:1;}}
+.kc-desktop .scan-btn,.kc-desktop .action-card,.kc-desktop .recycler-card,.kc-desktop .lot-card{transition:transform .18s var(--ease,cubic-bezier(.22,.68,0,1)), border-color .18s, box-shadow .18s, background .18s;}
+.kc-desktop .action-card:hover,.kc-desktop .recycler-card:hover,.kc-desktop .lot-card:hover{transform:translateY(-3px); box-shadow:var(--kc-shadow);}
+.kc-reveal{opacity:0; transform:translateY(16px); transition:opacity .6s var(--ease,cubic-bezier(.22,.68,0,1)), transform .6s var(--ease,cubic-bezier(.22,.68,0,1));}
+.kc-reveal.in{opacity:1; transform:none;}
+@media (prefers-reduced-motion: reduce){
+  .kc-panel .screen.active{animation:none;}
+  .kc-reveal{opacity:1; transform:none; transition:none;}
+  .kc-desktop .action-card:hover,.kc-desktop .recycler-card:hover,.kc-desktop .lot-card:hover{transform:none;}
+}
+
+/* theme-safe fixes for former hardcoded colors */
+.kc-camera{background:#11201B !important; color:#F3F6F2 !important;}
+html[data-theme="dark"] .kc-camera{background:#0A0F0D !important;}
+.qr-box{background:#FFFFFF; color:#11201B;}   /* QR stays on white paper in both themes (correct) */
+
+/* neutralize the phone-only rules on desktop */
+.kc-desktop .app-shell{max-width:none; margin:0; min-height:0; border-radius:0; box-shadow:none; background:transparent;}
+.kc-desktop .bottom-nav{display:none;}
+.kc-desktop .offline-banner{display:none;}   /* moved into the page head as .kc-offline */
+
+/* ============================================================
+   Collector desktop screens — fill the panel like the recycler
+   portal instead of clustering in a narrow phone column.
+   All scoped to .kc-desktop @ >=900px so mobile is untouched.
+   ============================================================ */
+@media (min-width:900px){
+  /* Keep the per-screen header but restyle it as a clean panel toolbar
+     (back button, screen title, voice) — we only hide the brand logo on the
+     home screen since the top nav already shows branding. */
+  .kc-desktop .kc-panel .app-header{
+    padding:1.1rem 2.5rem; background:transparent; border-bottom:1px solid var(--color-border);
+  }
+  .kc-desktop #screen-home .app-header{display:none;}   /* home needs no toolbar */
+  .kc-desktop .kc-panel .app-content{padding:2rem 2.5rem 2.5rem;}
+  .kc-desktop #screen-home .app-content{padding-top:2.25rem;}
+
+  /* Each screen gets a heading strip so it reads like a real dashboard panel */
+  .kc-desktop .screen{position:relative;}
+
+  /* --- HOME --- wide scan banner + 4-up action grid, full width --- */
+  .kc-desktop #screen-home .app-content{display:grid; gap:1.25rem;}
+  .kc-desktop .scan-btn{
+    width:100%; min-height:132px; flex-direction:row; justify-content:flex-start;
+    gap:1.25rem; padding:1.5rem 1.75rem; text-align:left; border-radius:20px;
+  }
+  .kc-desktop .scan-btn .icon{font-size:2.4rem;}
+  .kc-desktop .scan-btn .label{font-size:1.4rem;}
+  .kc-desktop .scan-btn .hint{font-size:.95rem;}
+  .kc-desktop .action-grid{grid-template-columns:repeat(4,1fr); gap:1rem;}
+  .kc-desktop .action-card{padding:1.4rem 1rem; border-radius:16px;}
+  .kc-desktop .action-card .icon{font-size:2rem;}
+  .kc-desktop .earnings-snippet{padding:1.25rem 1.5rem; border-radius:16px;}
+
+  /* --- linear flow (scan / category / weight / value / arrange / handover /
+       done) reads best as a comfortable centered column, not full-bleed --- */
+  .kc-desktop #screen-scan .app-content,
+  .kc-desktop #screen-category .app-content,
+  .kc-desktop #screen-weight .app-content,
+  .kc-desktop #screen-value .app-content,
+  .kc-desktop #screen-arrange .app-content,
+  .kc-desktop #screen-handover .app-content,
+  .kc-desktop #screen-done .app-content{max-width:560px; margin-inline:auto;}
+
+  /* bigger, more premium camera + QR on desktop */
+  .kc-desktop #screen-scan .kc-camera{height:320px; border-radius:20px;}
+  .kc-desktop .qr-box{width:220px; height:220px; border-radius:18px;}
+
+  /* --- list / grid screens fill the width in responsive columns --- */
+  .kc-desktop #screen-match .app-content > .recycler-card,
+  .kc-desktop #screen-lots .app-content > .lot-card{margin-bottom:0;}
+  .kc-desktop #screen-match .app-content{display:grid; grid-template-columns:1fr; gap:.9rem;}
+  .kc-desktop #screen-match .sort-chips{grid-column:1/-1;}
+
+  .kc-desktop #screen-lots .app-content{display:grid; grid-template-columns:repeat(2,1fr); gap:1rem;}
+  .kc-desktop #screen-lots .lot-card{margin-bottom:0;}
+
+  .kc-desktop #screen-price .app-content{display:grid; grid-template-columns:repeat(2,1fr); gap:1rem;}
+  .kc-desktop #screen-price .app-content > p{grid-column:1/-1; margin:0;}
+  .kc-desktop #screen-price .price-board{margin:0;}
+
+  .kc-desktop #screen-earnings .app-content{max-width:720px; margin-inline:auto;}
+  .kc-desktop #screen-earnings .ledger-split{gap:1rem;}
+  /* by-material rows sit in a tidy 2-col grid */
+  .kc-desktop #screen-earnings .lot-card{margin-bottom:0;}
+  .kc-desktop #screen-earnings .app-content > .lot-card{display:flex;}
+
+  /* recycler cards a touch roomier */
+  .kc-desktop .recycler-card{padding:1.15rem 1.25rem; border-radius:16px;}
+  .kc-desktop .recycler-rank{width:36px; height:36px; font-size:.95rem;}
+
+  /* price hero numbers scale up a little to match the recycler portal weight */
+  .kc-desktop .price{font-size:2.2rem;}
+  .kc-desktop .ledger-total{font-size:2.75rem;}
+}
+
+/* headings inside the flow use the display font (matches recycler) */
+.kc-desktop .heading-1,.kc-desktop .heading-2,.kc-desktop .heading-3{font-family:var(--font-display);}
+
+/* left rail: active item gets a copper accent bar like a real nav */
+.kc-rail .rail-item{position:relative;}
+.kc-rail .rail-item.active::before{
+  content:""; position:absolute; left:0; top:50%; transform:translateY(-50%);
+  width:3px; height:60%; border-radius:0 3px 3px 0; background:var(--copper);
+}
+
+/* ============================================================
+   Recycler portal — light polish for parity with the collector
+   (hover lift + softer shadows). Structure/JS untouched.
+   ============================================================ */
+.portal-main .request-card,
+.portal-main .ops-card,
+.portal-main .card,
+.portal-main .mat-row{
+  transition:transform .18s var(--ease,cubic-bezier(.22,.68,0,1)), border-color .18s, box-shadow .18s;
+}
+.portal-main .request-card{box-shadow:var(--kc-shadow);}
+.portal-main .request-card:hover,
+.portal-main .ops-card:hover{transform:translateY(-3px); box-shadow:var(--kc-shadow); border-color:color-mix(in srgb, var(--copper) 35%, var(--color-border));}
+.portal-main .ops-card .num{font-family:var(--font-display);}
+.portal-main .portal-header h1{font-family:var(--font-display);}
+@media (prefers-reduced-motion: reduce){
+  .portal-main .request-card:hover,.portal-main .ops-card:hover{transform:none;}
+}
